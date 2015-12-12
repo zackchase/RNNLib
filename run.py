@@ -12,7 +12,8 @@ import random
 ###############################
 
 # f = open("../data/reuters21578/reut2-002.sgm")
-f = open("../data/tinyshakespeare/input.txt")
+#f = open("../data/tinyshakespeare/input.txt")
+f=open("./input.txt")
 text = f.read()
 f.close()
 
@@ -45,4 +46,5 @@ def infer_stochastic(rnn, k, temperature, start_char=" "):
 
     rnn.reset_state()
 
-
+train(0.01, 800)
+infer_stochastic(rnn,100,0.5)
