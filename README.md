@@ -1,2 +1,2 @@
-# PyRNN
-A general purpose RNN library based on Python &amp; theano.
+# modified PyRNN
+A collaborative deep method for POI rec based on PyRNN
