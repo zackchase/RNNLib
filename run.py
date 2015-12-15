@@ -16,11 +16,36 @@ import random
 #f = open("../data/tinyshakespeare/input.txt")
 
 class pdata(object):
-    def __init__(self,uhash,phash,plist,ptrack):
+    def __init__(self,uhash,phash,ratings,plist,ptrack,rating_count,split):
         self.uhash=uhash
         self.phash=phash
         self.plist=plist
         self.ptrack=ptrack
+        self.ratings=ratings
+        self.nuser=len(uhash)
+        self.npoi=len(phash)
+        self.rating_count=rating_count
+        self.split=split
+        self.split_data(self.split)
+
+    def split_data(self, percentage):
+        cur_test=0
+        test_case=(1-percentage)*self.rating_count
+        print 'Test case: ', test_case
+        for user in self.ratings.keys():
+            if len(self.ratings[user].item_set.keys())<5:
+                continue
+            if cur_test>=test_case:
+                break
+            for item in self.ratings[user].item_set.keys():
+                if cur_test<test_case and np.random.random()>percentage:
+                    cur_test+=1
+                    self.ratings[user].item_set[item]+=10
+        for i in range(len(self.ptrack)):
+            user=self.ptrack[i]
+            for item in self.plist[i]:
+                if self.ratings[user].item_set[item]>8:
+                    self.plist[i].remove(item)
 
 class Pnode:
     def __init__(self,pid):
@@ -33,11 +58,9 @@ def load_data(f,split):
     f.close()
     return text
 
-#rnn = CharRNN()
-def load_poi_data(f,split):
+def load_poi_data(fi,split):
     if True:
         vocab_items = {}
-        vocab_4table=[]
         user_hash={}
         vocab_hash = {}
         poi_track={}
@@ -54,9 +77,7 @@ def load_poi_data(f,split):
                 user=tokens[0]
                 user_hash[user]=user_hash.get(user, int(len(user_hash)))
                 user=user_hash[user]
-#                print "u", user
                 line=fi.next()
-#                print line
                 continue
             token=tokens[1]
             time=tokens[0].split("T")[0]
@@ -65,17 +86,14 @@ def load_poi_data(f,split):
                 if len(poi_per_track)!=0:
                     poi_track[len(poi_list)]=pre_user
                     poi_list.append(poi_per_track)
-#                    print poi_per_track
                 pre_user=user
                 date=time
                 poi_per_track=[]
             if token not in vocab_hash:
                 vocab_hash[token] = vocab_hash.get(token,int(len(vocab_hash)))
-                vocab_4table.append(VocabItem(token))
             token=vocab_hash[token]
-            vocab_4table[token].count+=1
             poi_per_track.append(token)
-            vocab_items[user]=vocab_items.get(user,VocabItem(user))
+            vocab_items[user]=vocab_items.get(user,Pnode(user))
             vocab_items[user].item_set[token]=rating
             rating_count += 1
             if rating_count % 10000 == 0:
@@ -83,54 +101,14 @@ def load_poi_data(f,split):
                 sys.stdout.flush()
             #if rating_count>10000:
             #    break
-            # Add special tokens <bol> (beginning of line) and <eol> (end of line)
         fi.close()
         sys.stdout.write("%s reading completed\n" % fi)
-          #self.bytes = fi.tell()
-        self.vocab_items = vocab_items         # List of VocabItem objects
-        self.vocab_hash = vocab_hash           # Mapping from each token to its index in vocab
-        self.rating_count = rating_count           # Total number of words in train file
-        self.user_count=len(user_hash.keys())
-        self.item_count=len(vocab_hash.keys())
-        self.poi_track=poi_track
-        self.poi_list=poi_list
-        self.vocab_4table=vocab_4table
-        # Add special token <unk> (unknown),
-        # merge words occurring less than min_count into <unk>, and
-        # sort vocab in descending order by frequency in train file
-
-#        self.__sort(min_count)
-        print self.rating_count
-        print self.rating_count*percentage
-        self.split(percentage)
-        #assert self.word_count == sum([t.count for t in self.vocab_items]), 'word_count and sum of t.count do not agree'
-        print 'Total user in training file: %d' % self.user_count
-        print 'Total item in training file: %d' % self.item_count
-        print 'Total rating in file: %d' % self.rating_count
-        print 'Total POI tracking (day): %d' % len(self.poi_track.keys())
-        print len(poi_list)
-#        print 'Total raiting in testing set: %d' % self.rating_count-int(self.rating_count*percentage)
-        #print 'Vocab size: %d' % len(self)
-
-    def split(self, percentage):
-        cur_test=0
-        test_case=(1-percentage)*self.rating_count
-        print 'Test case: ', test_case
-        #print test_case
-        for user in self.vocab_items.keys():
-            if len(self.vocab_items[user].item_set.keys())<5:
-                continue
-            if cur_test>=test_case:
-                break
-            for item in self.vocab_items[user].item_set.keys():
-                if cur_test<test_case and np.random.random()>percentage:
-                    cur_test+=1
-                    self.vocab_items[user].item_set[item]+=10
-        for i in range(len(self.poi_track)):
-            user=self.poi_track[i]
-            for item in self.poi_list[i]:
-                if self.vocab_items[user].item_set[item]>8:
-                    self.poi_list[i].remove(item)
+        dnodex=pdata(user_hash,vocab_hash,vocab_items,poi_list,poi_track,rating_count,percentage)
+        print 'Complete Loading...'
+        print '#User: ', dnodex.nuser
+        print '#POI: ',dnodex.npoi
+        print '#Check-in: ', dnodex.rating_count
+        print '#POI tracks: ', len(poi_track)
 
 
 
@@ -172,7 +150,7 @@ if __name__ == '__main__':
     parser.add_argument('-eta',dest='eta',default=0.01,type=float)
     parser.add_argument('-iters', dest='iters', default=800,type=int)
     args=parser.parse_args()
-    data = load_data(args.fi,args.split)
+    data = load_poi_data(args.fi,args.split)
     rnn=CharRNN()
     train(data,args.eta,args.iters)
     infer_stochastic(rnn,100,0.5)
