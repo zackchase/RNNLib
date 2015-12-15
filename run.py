@@ -109,7 +109,7 @@ def load_poi_data(fi,split):
         print '#POI: ',dnodex.npoi
         print '#Check-in: ', dnodex.rating_count
         print '#POI tracks: ', len(poi_track)
-
+        return dnodex
 
 
 
