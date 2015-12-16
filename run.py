@@ -24,10 +24,11 @@ class pdata(object):
         self.ratings=ratings
         self.nuser=len(uhash)
         self.npoi=len(phash)
-        self.umatrix=random_weights((self.nuser,inputdim))
-        self.pmatrix=random_weights((self.npoi,inputdim))
-        self.rating_count=rating_count
+        self.umatrix=None
+	self.pmatrix=None
+	self.rating_count=rating_count
         self.split=split
+	self.inputdim=inputdim
         self.test_track=self.split_data(self.split)
 
     def split_data(self, percentage):
@@ -111,9 +112,22 @@ def load_poi_data(fi,split,inputdim):
         print '#Tracks for testing:, ', len(dnodex.test_track)
         return dnodex
 
+def personalized_train(dnodex, eta, iters):
+    for it in xrange(iters):
+        i = random.randint(0,len(dnodex.plist)-1)
+        while len(dnodex.plist[i])<=2 or i in dnodex.test_track:
+            i=random.randint(0,len(dnodex.plist)-1)
+#        print len(dnodex.plist[i])
+        X = dnodex.plist[i][:-1]
+        Y = dnodex.plist[i][1:]
+	user=dnodex.ptrack[i]
+	lossf=str(rnn.train(dnodex.pmatrix[X,:],dnodex.pmatrix[Y,:], dnodex.umatrix[[user],:], eta, 1.0))
+        if it%500==0:
+            print "iteration: %s, cost: %s" % (str(it), lossf)
+            #infer_stochastic(dnodex,rnn)
 
 
-seq_len = 150
+
 
 def non_personalized_train(dnodex, eta, iters):
     for it in xrange(iters):
@@ -159,13 +173,24 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-train', help='Training file', dest='fi', required=True)
     parser.add_argument('-split', help='Split for testing', dest='split', type=float,default=0.8)
+    parser.add_argument('-module', help='Model module, 0: non_personalized, 1: personalized, 2: collaborative, 3: MF+collaborative+personalized', dest='module', default=0, type=int)
     parser.add_argument('-inputdim', help='Dimensionality of input poi', dest='inputdim', default=10, type=int)
     parser.add_argument('-dim', help='Dimensionality of hidden layers', dest='dim', default=10, type=int)
     parser.add_argument('-eta',dest='eta',default=0.002,type=float)
     parser.add_argument('-iters', dest='iters', default=800,type=int)
     args=parser.parse_args()
     data = load_poi_data(args.fi,args.split,args.inputdim)
-    rnn=CharRNN(data,args.dim)
-    non_personalized_train(data,args.eta,args.iters)
-    infer_stochastic(data,rnn)
+    if args.module==0:
+	print 'Non_personalized Seq Modeling'
+        rnn=CharRNN(data,args.dim)
+    	non_personalized_train(data,args.eta,args.iters)
+    	infer_stochastic(data,rnn)
+    elif args.module==1:
+        print 'Personalized Seq Modeling'
+	data.umatrix={i:random_weights((args.inputdim,args.inputdim)) for i in range(data.nuser)}
+        data.pmatrix=random_weights((data.npoi,inputdim))
+	rnn=PerRNN(data,args.inputdim,args.dim)
+	personalized_train(data,args.eta,args.iters)
+	infer_stochastic(data, rnn)
+	
 
