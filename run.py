@@ -1,6 +1,6 @@
 import argparse
 from char_rnn import CharRNN
-from lib import one_hot, one_hot_to_string, floatX
+from lib import one_hot, one_hot_to_string, floatX, random_weights
 import numpy as np
 import theano
 import theano.tensor as T
@@ -16,7 +16,7 @@ import random
 #f = open("../data/tinyshakespeare/input.txt")
 
 class pdata(object):
-    def __init__(self,uhash,phash,ratings,plist,ptrack,rating_count,split):
+    def __init__(self,uhash,phash,ratings,plist,ptrack,rating_count,split,inputdim):
         self.uhash=uhash
         self.phash=phash
         self.plist=plist
@@ -24,28 +24,26 @@ class pdata(object):
         self.ratings=ratings
         self.nuser=len(uhash)
         self.npoi=len(phash)
+        self.umatrix=random_weights((self.nuser,inputdim))
+        self.pmatrix=random_weights((self.npoi,inputdim))
         self.rating_count=rating_count
         self.split=split
-        self.split_data(self.split)
+        self.test_track=self.split_data(self.split)
 
     def split_data(self, percentage):
         cur_test=0
-        test_case=(1-percentage)*self.rating_count
-        print 'Test case: ', test_case
-        for user in self.ratings.keys():
-            if len(self.ratings[user].item_set.keys())<5:
-                continue
-            if cur_test>=test_case:
-                break
-            for item in self.ratings[user].item_set.keys():
-                if cur_test<test_case and np.random.random()>percentage:
+        res=[]
+        test_case=(1-percentage)*len(self.plist)
+        #print 'Test case: ', test_case
+        while test_case>=cur_test:
+            #print cur_test
+            for i in range(len(self.ptrack)):
+                if random.random()>percentage*0.8 and test_case>=cur_test:
+                    res.append(i)
                     cur_test+=1
-                    self.ratings[user].item_set[item]+=10
-        for i in range(len(self.ptrack)):
-            user=self.ptrack[i]
-            for item in self.plist[i]:
-                if self.ratings[user].item_set[item]>8:
-                    self.plist[i].remove(item)
+                if test_case<cur_test:
+                    break
+        return res
 
 class Pnode:
     def __init__(self,pid):
@@ -58,7 +56,7 @@ def load_data(f,split):
     f.close()
     return text
 
-def load_poi_data(fi,split):
+def load_poi_data(fi,split,inputdim):
     if True:
         vocab_items = {}
         user_hash={}
@@ -94,7 +92,8 @@ def load_poi_data(fi,split):
             token=vocab_hash[token]
             poi_per_track.append(token)
             vocab_items[user]=vocab_items.get(user,Pnode(user))
-            vocab_items[user].item_set[token]=rating
+            vocab_items[user].item_set[token]=vocab_items[user].item_set.get(token,int(0))
+            vocab_items[user].item_set[token]+=1
             rating_count += 1
             if rating_count % 10000 == 0:
                 sys.stdout.write("\rReading ratings %d" % rating_count)
@@ -103,41 +102,55 @@ def load_poi_data(fi,split):
             #    break
         fi.close()
         sys.stdout.write("%s reading completed\n" % fi)
-        dnodex=pdata(user_hash,vocab_hash,vocab_items,poi_list,poi_track,rating_count,percentage)
+        dnodex=pdata(user_hash,vocab_hash,vocab_items,poi_list,poi_track,rating_count,split,inputdim)
         print 'Complete Loading...'
         print '#User: ', dnodex.nuser
         print '#POI: ',dnodex.npoi
         print '#Check-in: ', dnodex.rating_count
         print '#POI tracks: ', len(poi_track)
+        print '#Tracks for testing:, ', len(dnodex.test_track)
         return dnodex
 
 
 
 seq_len = 150
 
-def train(text,eta, iters):
+def non_personalized_train(dnodex, eta, iters):
     for it in xrange(iters):
-        i = random.randint(0, len(text)/seq_len)
-        j = i * seq_len
+        i = random.randint(0,len(dnodex.plist)-1)
+        while len(dnodex.plist[i])<=2 or i in dnodex.test_track:
+            i=random.randint(0,len(dnodex.plist)-1)
+#        print len(dnodex.plist[i])
+        X = dnodex.plist[i][:-1]
+        Y = dnodex.plist[i][1:]
+        lossf=str(rnn.train(one_hot(X,len(format(dnodex.npoi,'b'))), one_hot(Y,len(format(dnodex.npoi,'b'))), eta, 1.0))
+        if it%500==0:
+            print "iteration: %s, cost: %s" % (str(it), lossf)
+            #infer_stochastic(dnodex,rnn)
 
-        X = text[j:(j+seq_len)]
-        Y = text[(j+1):(j+1+seq_len)]
-
-        print "iteration: %s, cost: %s" % (str(it), str(rnn.train(one_hot(X), one_hot(Y), eta, 1.0)))
-
-
-def infer_stochastic(rnn, k, temperature, start_char=" "):
-    x = [one_hot(start_char).flatten()]
-
-    for i in xrange(k):
-        probs = rnn.predict_char(x, temperature)
-        p = np.asarray(probs[0], dtype="float64")
-        p /= p.sum()
-        sample = np.random.multinomial(1, p)
-        sys.stdout.write(one_hot_to_string(sample))
-        x = [sample]
-
-    rnn.reset_state()
+def infer_stochastic(dnodex, rnn):
+    precision=0
+    test_case=0
+    for test_index in dnodex.test_track:
+        test=dnodex.plist[test_index]
+        if len(test)==1:
+            precision+=1
+            test_case+=1
+            continue
+        for index in range(len(test)-1):
+            x = [one_hot([test[index]],len(format(dnodex.npoi,'b'))).flatten()]
+            probs = rnn.predict_char(x, 1)
+            #print probs
+            p = np.asarray(probs[0], dtype="float64")
+            p /= p.sum()
+            sample = np.random.multinomial(len(p), p)
+            #print sample
+            res=one_hot_to_string(sample)
+            if res==test[index+1]:
+                precision+=1.0
+            test_case+=1.0
+        rnn.reset_state()
+    print 'Precision: ', precision/test_case
 
 
 
@@ -146,12 +159,13 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-train', help='Training file', dest='fi', required=True)
     parser.add_argument('-split', help='Split for testing', dest='split', type=float,default=0.8)
-    parser.add_argument('-dim', help='Dimensionality of word embeddings', dest='dim', default=10, type=int)
-    parser.add_argument('-eta',dest='eta',default=0.01,type=float)
+    parser.add_argument('-inputdim', help='Dimensionality of input poi', dest='inputdim', default=10, type=int)
+    parser.add_argument('-dim', help='Dimensionality of hidden layers', dest='dim', default=10, type=int)
+    parser.add_argument('-eta',dest='eta',default=0.002,type=float)
     parser.add_argument('-iters', dest='iters', default=800,type=int)
     args=parser.parse_args()
-    data = load_poi_data(args.fi,args.split)
-    rnn=CharRNN()
-    train(data,args.eta,args.iters)
-    infer_stochastic(rnn,100,0.5)
+    data = load_poi_data(args.fi,args.split,args.inputdim)
+    rnn=CharRNN(data,args.dim)
+    non_personalized_train(data,args.eta,args.iters)
+    infer_stochastic(data,rnn)
 

@@ -2,13 +2,15 @@ import numpy as np
 import theano
 import theano.tensor as T
 
-def one_hot(string):
+def one_hot(seq,s):
     """
-    Take a string and return a one-hot encoding with ASCII
+    Take a seq and size of total items,s as input, return one-hot-bit representation of the seq
     """
-    res = np.zeros((len(string), 256))
-    for i in xrange(len(string)):
-        res[i,ord(string[i])] = 1.
+    res = np.zeros((len(seq), s))
+    for i in xrange(len(seq)):
+	tmpr=format(seq[i],'b')
+	for x in range(len(tmpr)):
+            res[i,s-1-x] = float(tmpr[len(tmpr)-1-x])+0.
     return res
 
 def floatX(X):
@@ -71,7 +73,7 @@ def sample_char(probs):
 
 
 def one_hot_to_string(one_hot):
-    return chr(one_hot.nonzero()[0][0])
+    return int(''.join('1' if x>0 else '0' for x in one_hot),2)
 
 def get_params(layers):
     params = []
