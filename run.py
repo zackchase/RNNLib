@@ -1,5 +1,6 @@
 import argparse
 from char_rnn import CharRNN
+from non_personalized_rnn import NonPerRNN
 from personalize_rnn import PerRNN
 from lib import one_hot, one_hot_to_string, floatX, random_weights
 import numpy as np
@@ -208,7 +209,7 @@ if __name__ == '__main__':
     data = load_poi_data(args.fi,args.split,args.inputdim)
     if args.module==0:
 	print 'Non_personalized Seq Modeling'
-        rnn=CharRNN(data,args.dim)
+        rnn=NonPerRNN(data,args.dim)
     	non_personalized_train(data,args.eta,args.iters)
     	infer_stochastic(data,rnn)
     elif args.module==1:
