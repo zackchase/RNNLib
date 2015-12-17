@@ -1,5 +1,6 @@
 import argparse
 from char_rnn import CharRNN
+from personalize_rnn import PerRNN
 from lib import one_hot, one_hot_to_string, floatX, random_weights
 import numpy as np
 import theano
@@ -99,8 +100,8 @@ def load_poi_data(fi,split,inputdim):
             if rating_count % 10000 == 0:
                 sys.stdout.write("\rReading ratings %d" % rating_count)
                 sys.stdout.flush()
-            #if rating_count>10000:
-            #    break
+#            if rating_count>10000:
+#                break
         fi.close()
         sys.stdout.write("%s reading completed\n" % fi)
         dnodex=pdata(user_hash,vocab_hash,vocab_items,poi_list,poi_track,rating_count,split,inputdim)
@@ -121,7 +122,7 @@ def personalized_train(dnodex, eta, iters):
         X = dnodex.plist[i][:-1]
         Y = dnodex.plist[i][1:]
 	user=dnodex.ptrack[i]
-	lossf=str(rnn.train(dnodex.pmatrix[X,:],dnodex.pmatrix[Y,:], dnodex.umatrix[[user],:], eta, 1.0))
+        lossf=str(rnn.train(X,Y,user, eta, 1.0))
         if it%500==0:
             print "iteration: %s, cost: %s" % (str(it), lossf)
             #infer_stochastic(dnodex,rnn)
@@ -166,6 +167,31 @@ def infer_stochastic(dnodex, rnn):
         rnn.reset_state()
     print 'Precision: ', precision/test_case
 
+def infer_personalized(dnodex, rnn):
+    precision=0
+    test_case=0
+    for test_index in dnodex.test_track:
+        test=dnodex.plist[test_index]
+	tuser=dnodex.ptrack[test_index]
+        if len(test)==1:
+            precision+=1
+            test_case+=1
+            continue
+        for index in range(len(test)-1):
+            x = [one_hot([test[index]],len(format(dnodex.npoi,'b'))).flatten()]
+            probs = rnn.predict_char(x,tuser, 1)
+            #print probs
+            p = np.asarray(probs[0], dtype="float64")
+            p /= p.sum()
+            sample = np.random.multinomial(len(p), p)
+            #print sample
+            res=one_hot_to_string(sample)
+            if res==test[index+1]:
+                precision+=1.0
+            test_case+=1.0
+        rnn.reset_state()
+    print 'Precision: ', precision/test_case
+
 
 
 
@@ -187,10 +213,8 @@ if __name__ == '__main__':
     	infer_stochastic(data,rnn)
     elif args.module==1:
         print 'Personalized Seq Modeling'
-	data.umatrix={i:random_weights((args.inputdim,args.inputdim)) for i in range(data.nuser)}
-        data.pmatrix=random_weights((data.npoi,inputdim))
-	rnn=PerRNN(data,args.inputdim,args.dim)
+        rnn=PerRNN(data,args.inputdim,args.dim)
 	personalized_train(data,args.eta,args.iters)
-	infer_stochastic(data, rnn)
+	infer_personalized(data, rnn)
 	
 

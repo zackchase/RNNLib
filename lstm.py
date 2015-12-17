@@ -114,10 +114,10 @@ class InputPLayer(NNLayer):
     """
     def __init__(self, X, Z, name=""):
         self.name = name
-        self.X = X
-	self.Z = Z
-        self.params=[self.X, self.Z]
-
+        self.params=[]
+	self.X = X#theano.shared(X)
+	self.Z = Z#theano.shared(Z)#dnodex.umatrix[0,:,:]
+        self.params=[X,Z]
     def output(self):
         return T.dot(self.X,self.Z)
 
@@ -138,7 +138,7 @@ class InputLayer(NNLayer):
 class SoftmaxPLayer(NNLayer):
     """
     """
-    def __init__(self, num_input, num_output, input_layer, Z,temperature=1.0, name=""):
+    def __init__(self, num_input, num_output, Z, input_layer, temperature=1.0, name=""):
         self.name = ""
         self.X = input_layer.output()
         self.params = []
@@ -147,10 +147,10 @@ class SoftmaxPLayer(NNLayer):
         self.W_yh = random_weights((num_input, num_output))
         self.b_y = zeros(num_output)
 
-        self.params = [self.W_yh, self.b_y, self.Z]
+        self.params = [self.W_yh, self.b_y]
 
     def output(self):
-        return softmax((T.dot(T.dot(self.X, self.W_yh) + self.b_y),self.Z), temperature=self.temp)
+        return softmax((T.dot(T.dot(self.X, self.W_yh) + self.b_y, self.Z)), temperature=self.temp)
 
 
 class SoftmaxLayer(NNLayer):
