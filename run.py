@@ -101,8 +101,8 @@ def load_poi_data(fi,split,inputdim):
             if rating_count % 10000 == 0:
                 sys.stdout.write("\rReading ratings %d" % rating_count)
                 sys.stdout.flush()
-#            if rating_count>10000:
-#                break
+            #if rating_count>10000:
+            #    break
         fi.close()
         sys.stdout.write("%s reading completed\n" % fi)
         dnodex=pdata(user_hash,vocab_hash,vocab_items,poi_list,poi_track,rating_count,split,inputdim)
@@ -150,8 +150,8 @@ def infer_stochastic(dnodex, rnn):
     for test_index in dnodex.test_track:
         test=dnodex.plist[test_index]
         if len(test)==1:
-            precision+=1
-            test_case+=1
+            #precision+=1
+            #test_case+=1
             continue
         for index in range(len(test)-1):
             x = [one_hot([test[index]],len(format(dnodex.npoi,'b'))).flatten()]
@@ -170,27 +170,26 @@ def infer_stochastic(dnodex, rnn):
 
 def infer_personalized(dnodex, rnn):
     precision=0
-    test_case=0
+    test_case=0.000001
     for test_index in dnodex.test_track:
         test=dnodex.plist[test_index]
 	tuser=dnodex.ptrack[test_index]
         if len(test)==1:
-            precision+=1
-            test_case+=1
+            #precision+=1
+            #test_case+=1
             continue
         for index in range(len(test)-1):
-            x = [one_hot([test[index]],len(format(dnodex.npoi,'b'))).flatten()]
-            probs = rnn.predict_char(x,tuser, 1)
+            x=test[index]#dnodex.pmatrix[test[index],:] #= [one_hot([test[index]],len(format(dnodex.npoi,'b'))).flatten()]
+            #print x, tuser
+            probs = rnn.predict_char([x],tuser, 1)
             #print probs
-            p = np.asarray(probs[0], dtype="float64")
-            p /= p.sum()
-            sample = np.random.multinomial(len(p), p)
-            #print sample
-            res=one_hot_to_string(sample)
-            if res==test[index+1]:
+            r=np.array(T.dot(probs,T.dot(dnodex.pmatrix, dnodex.umatrix[tuser,:,:]).transpose()).eval())
+            res=np.argsort(r)[:11]
+            #print res
+            if test[index+1] in res:
                 precision+=1.0
             test_case+=1.0
-        rnn.reset_state()
+            rnn.reset_state()
     print 'Precision: ', precision/test_case
 
 
@@ -211,11 +210,15 @@ if __name__ == '__main__':
 	print 'Non_personalized Seq Modeling'
         rnn=NonPerRNN(data,args.dim)
     	non_personalized_train(data,args.eta,args.iters)
+	print 'Train completed'
+        print 'Prediction starts...'
     	infer_stochastic(data,rnn)
     elif args.module==1:
         print 'Personalized Seq Modeling'
         rnn=PerRNN(data,args.inputdim,args.dim)
 	personalized_train(data,args.eta,args.iters)
-	infer_personalized(data, rnn)
+	print 'Train completed'
+        print 'Prediction starts...'
+        infer_personalized(data, rnn)
 	
 
