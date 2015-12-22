@@ -149,6 +149,9 @@ def infer_stochastic(dnodex, rnn):
     test_case=0
     for test_index in dnodex.test_track:
         test=dnodex.plist[test_index]
+        if test_index%100==0:
+            sys.stdout.write('\r%d prediction finished, current precision: %4f,%f,%f...' % (test_index,precision/test_case, precision, test_case))
+            sys.stdout.flush()
         if len(test)==1:
             #precision+=1
             #test_case+=1
@@ -165,7 +168,7 @@ def infer_stochastic(dnodex, rnn):
             if res==test[index+1]:
                 precision+=1.0
             test_case+=1.0
-        rnn.reset_state()
+            rnn.reset_state()
     print 'Precision: ', precision/test_case
 
 def infer_personalized(dnodex, rnn):
@@ -174,6 +177,9 @@ def infer_personalized(dnodex, rnn):
     for test_index in dnodex.test_track:
         test=dnodex.plist[test_index]
 	tuser=dnodex.ptrack[test_index]
+        if test_index%100==0:
+            sys.stdout.write('\r%d prediction finished, current precision: %4f,%f,%f...' % (test_index,precision/test_case, precision, test_case))
+            sys.stdout.flush()
         if len(test)==1:
             #precision+=1
             #test_case+=1
@@ -183,9 +189,8 @@ def infer_personalized(dnodex, rnn):
             #print x, tuser
             probs = rnn.predict_char([x],tuser, 1)
             #print probs
-            r=np.array(T.dot(probs,T.dot(dnodex.pmatrix, dnodex.umatrix[tuser,:,:]).transpose()).eval())
-            res=np.argsort(r)[:11]
-            #print res
+            r=T.dot(probs,T.dot(dnodex.pmatrix, dnodex.umatrix[tuser,:,:]).transpose()).eval()
+            res=np.argsort(r[0])[:5]
             if test[index+1] in res:
                 precision+=1.0
             test_case+=1.0
