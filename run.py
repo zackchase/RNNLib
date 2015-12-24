@@ -173,9 +173,11 @@ def infer_stochastic(dnodex, rnn):
             rnn.reset_state()
     print 'Precision: ', precision/test_case
 
+
 def infer_personalized(dnodex, rnn):
     precision=0
     test_case=0.000001
+    cumu_auc=0.0
     for test_index in dnodex.test_track:
         test=dnodex.plist[test_index]
 	tuser=dnodex.ptrack[test_index]
@@ -194,12 +196,23 @@ def infer_personalized(dnodex, rnn):
             probs = rnn.predict_char([x],tuser, 1)
             #print probs
             r=T.dot(probs,T.dot(dnodex.pmatrix, dnodex.umatrix[tuser,:,:]).transpose()).eval()
-            res=np.argsort(r[0])[:5]
-            if test[index+1] in res:
+            hit=0
+            num_correct_pairs=0
+            res=np.argsort(r[0])
+            for i in range(len(res)):
+                if res[i] in test:
+                    hit+=1
+                else:
+                    num_correct_pairs+=hit
+            cumu_auc+= (float)(num_correct_pairs)/((dnodex.npoi - len(test)) * len(test)
+            if test[index+1] in res[:5]:
                 precision+=1.0
             test_case+=1.0
             rnn.reset_state()
     print 'Precision: ', precision/test_case
+    print 'AUC: ', cumu_auc/test_case
+
+
 
 
 
