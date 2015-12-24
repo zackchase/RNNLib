@@ -19,13 +19,13 @@ class PerRNN:
         num_output = inputdim
         inputs = InputPLayer(self.dnodex.pmatrix[X,:], self.dnodex.umatrix[Z,:,:], name="inputs")
         lstm1 = LSTMLayer(num_input, num_hidden, input_layer=inputs, name="lstm1")
-        lstm2 = LSTMLayer(num_hidden, num_hidden, input_layer=lstm1, name="lstm2")
+        #lstm2 = LSTMLayer(num_hidden, num_hidden, input_layer=lstm1, name="lstm2")
         #lstm3 = LSTMLayer(num_hidden, num_hidden, input_layer=lstm2, name="lstm3")
-        softmax = SoftmaxPLayer(num_hidden, num_output, self.dnodex.umatrix[Z,:,:], input_layer=lstm2, name="yhat", temperature=temperature)
+        softmax = SoftmaxPLayer(num_hidden, num_output, self.dnodex.umatrix[Z,:,:], input_layer=lstm1, name="yhat", temperature=temperature)
 
         Y_hat = softmax.output()
 
-        self.layers = inputs, lstm1, lstm2, softmax
+        self.layers = inputs, lstm1,softmax
         params = get_params(self.layers)
         #caches = make_caches(params)
 

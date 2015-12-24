@@ -146,12 +146,14 @@ def non_personalized_train(dnodex, eta, iters):
 
 def infer_stochastic(dnodex, rnn):
     precision=0
-    test_case=0
+    test_case=0.0000001
     for test_index in dnodex.test_track:
         test=dnodex.plist[test_index]
         if test_index%100==0:
             sys.stdout.write('\r%d prediction finished, current precision: %4f,%f,%f...' % (test_index,precision/test_case, precision, test_case))
             sys.stdout.flush()
+        if test_index>=500:
+            break
         if len(test)==1:
             #precision+=1
             #test_case+=1
@@ -180,6 +182,8 @@ def infer_personalized(dnodex, rnn):
         if test_index%100==0:
             sys.stdout.write('\r%d prediction finished, current precision: %4f,%f,%f...' % (test_index,precision/test_case, precision, test_case))
             sys.stdout.flush()
+        if test_index>=500:
+            break
         if len(test)==1:
             #precision+=1
             #test_case+=1
