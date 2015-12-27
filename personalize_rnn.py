@@ -13,15 +13,17 @@ class PerRNN:
         temperature=T.scalar()
         self.dnodex=dnodex
         num_input = inputdim
-	self.dnodex.umatrix=theano.shared(floatX(np.random.randn(*(self.dnodex.nuser,inputdim, inputdim))))
-        self.dnodex.pmatrix=theano.shared(floatX(np.random.randn(*(self.dnodex.npoi,inputdim))))
+	dnodex.umatrix=theano.shared(floatX(np.random.randn(*(self.dnodex.nuser,inputdim, inputdim))))
+        dnodex.pmatrix=theano.shared(floatX(np.random.randn(*(self.dnodex.npoi,inputdim))))
+        dnodex.p_l2_norm=(dnodex.pmatrix**2).sum()
+        dnodex.u_l2_norm=(dnodex.umatrix**2).sum()
         num_hidden = dim
         num_output = inputdim
-        inputs = InputPLayer(self.dnodex.pmatrix[X,:], self.dnodex.umatrix[Z,:,:], name="inputs")
+        inputs = InputPLayer(dnodex.pmatrix[X,:], dnodex.umatrix[Z,:,:], name="inputs")
         lstm1 = LSTMLayer(num_input, num_hidden, input_layer=inputs, name="lstm1")
         #lstm2 = LSTMLayer(num_hidden, num_hidden, input_layer=lstm1, name="lstm2")
         #lstm3 = LSTMLayer(num_hidden, num_hidden, input_layer=lstm2, name="lstm3")
-        softmax = SoftmaxPLayer(num_hidden, num_output, self.dnodex.umatrix[Z,:,:], input_layer=lstm1, name="yhat", temperature=temperature)
+        softmax = SoftmaxPLayer(num_hidden, num_output, dnodex.umatrix[Z,:,:], input_layer=lstm1, name="yhat", temperature=temperature)
 
         Y_hat = softmax.output()
 
@@ -29,7 +31,7 @@ class PerRNN:
         params = get_params(self.layers)
         #caches = make_caches(params)
 
-	cost = T.mean(T.nnet.categorical_crossentropy(Y_hat, T.dot(self.dnodex.pmatrix[Y,:],self.dnodex.umatrix[Z,:,:])))
+	cost = T.mean(T.nnet.categorical_crossentropy(Y_hat, T.dot(dnodex.pmatrix[Y,:],dnodex.umatrix[Z,:,:])))+eta*dnodex.p_l2_norm+eta*dnodex.u_l2_norm
         updates = PerSGD(cost,params,eta,X,Z,self.dnodex)#momentum(cost, params, caches, eta)
 
         self.train = theano.function([X,Y,Z, eta, temperature], cost, updates=updates, allow_input_downcast=True)

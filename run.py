@@ -32,7 +32,12 @@ class pdata(object):
         self.split=split
 	self.inputdim=inputdim
         self.test_track=self.split_data(self.split)
-
+        for tindex in self.test_track:
+            user=self.ptrack[tindex]
+            for x in self.plist[tindex]:
+                self.ratings[user].item_set[x]=-1
+        self.p_l2_norm=None
+        self.u_l2_norm=None
     def split_data(self, percentage):
         cur_test=0
         res=[]
@@ -128,6 +133,51 @@ def personalized_train(dnodex, eta, iters):
             print "iteration: %s, cost: %s" % (str(it), lossf)
             #infer_stochastic(dnodex,rnn)
 
+def personalized_pmf_train(dnodex, eta, iters):
+    for it in xrange(iters):
+        i = random.randint(0,len(dnodex.plist)-1)
+        while len(dnodex.plist[i])<=2 or i in dnodex.test_track:
+            i=random.randint(0,len(dnodex.plist)-1)
+#        print len(dnodex.plist[i])
+        X = dnodex.plist[i][:-1]
+        Y = dnodex.plist[i][1:]
+	user=dnodex.ptrack[i]
+        lossf=str(rnn.train(X,Y,user, eta, 1.0))
+        if it%500==0:
+            print "iteration: %s, cost: %s" % (str(it), lossf)
+            #infer_stochastic(dnodex,rnn)
+
+def personalized_pfp_train(dnodex, eta, iters):
+    for it in xrange(iters):
+        i = random.randint(0,len(dnodex.plist)-1)
+        while len(dnodex.plist[i])<=2 or i in dnodex.test_track:
+            i=random.randint(0,len(dnodex.plist)-1)
+#        print len(dnodex.plist[i])
+        X = dnodex.plist[i][:-1]
+        Y = dnodex.plist[i][1:]
+	user=dnodex.ptrack[i]
+        lossf=str(rnn.train(X,Y,user, eta, 1.0)) 
+        tmp_u=T.mean(T.dot(dnodex.pmatrix[X,:],dnodex.umatrix[user,:,:]),axis=0)
+        tmp_p=T.mean(dnodex.pmatrix[X,:],axis=0)
+        for pos_p in dnodex.plist[i]:
+            if dnodex.ratings[user].item_set[pos_p]<0:
+                continue
+            neg_poi=np.random.randint(dnodex.npoi)
+            while neg_poi in dnodex.ratings[user].item_set:
+                neg_poi=np.random.randint(dnodex.npoi)
+            sig=T.nnet.sigmoid(T.dot(tmp_u,(dnodex.pmatrix[pos_p,:]-dnodex.pmatrix[neg_poi,:]).T))   
+            bpr_loss=(1-sig)*sig
+            T.set_subtensor(dnodex.pmatrix[pos_p,:],dnodex.pmatrix[pos_p,:]+eta*bpr_loss*tmp_u-eta*eta*dnodex.pmatrix[pos_p,:])
+
+            T.set_subtensor(dnodex.pmatrix[neg_poi,:],dnodex.pmatrix[neg_poi,:]-eta*bpr_loss*tmp_u-eta*eta*dnodex.pmatrix[neg_poi,:])
+
+            T.set_subtensor(dnodex.umatrix[user,:,:],dnodex.umatrix[user,:,:]+eta*bpr_loss*T.dot(tmp_p.T,dnodex.pmatrix[pos_p,:]-dnodex.pmatrix[neg_poi,:])-eta*eta*dnodex.umatrix[user,:,:])
+
+        if it%500==0:
+            sys.stdout.write("\riteration: %s..." % (str(it)))
+            sys.stdout.flush()
+            #infer_stochastic(dnodex,rnn)
+
 
 
 
@@ -204,12 +254,54 @@ def infer_personalized(dnodex, rnn):
                     hit+=1
                 else:
                     num_correct_pairs+=hit
-            cumu_auc+= (float)(num_correct_pairs)/((dnodex.npoi - len(test)) * len(test)
-            if test[index+1] in res[:5]:
+            cumu_auc+= (float)(num_correct_pairs)/((dnodex.npoi - len(test)) * len(test))
+            if test[index+1] in res[0:10]:
                 precision+=1.0
             test_case+=1.0
             rnn.reset_state()
     print 'Precision: ', precision/test_case
+    print 'AUC: ', cumu_auc/test_case
+
+
+def infer_pfp(dnodex):
+    precision=0.0
+    test_case=0.000001
+    cumu_auc=0.0
+    for user in range(dnodex.nuser):
+        if user%100==0:
+            sys.stdout.write('\r%d user prediction finished, p@10: %4f, AUC: %4f...' % (user,precision/(10*test_case),cumu_auc/test_case))
+            sys.stdout.flush()
+        if user>=500:
+            break 
+        candidate=range(dnodex.npoi)
+        X=[]
+        test=[]
+        for p in dnodex.ratings[user].item_set:
+            if dnodex.ratings[user].item_set[p]>0:
+                candidate.remove(p)
+                X.append(p)
+            else:
+                test.append(p)
+        if len(candidate)>0 and len(X)>0 and len(test)>0:
+            print '\n train_poi', len(X),len(candidate),len(test)
+
+            #print dnodex.pmatrix[X,:].eval()
+            tmp_u=T.mean(T.dot(dnodex.pmatrix[X,:],dnodex.umatrix[user,:,:]),axis=0)
+            print len(tmp_u.eval())
+            r=T.dot(tmp_u,dnodex.pmatrix[candidate,:].T).eval()
+            print 'predicted', len(r)
+            hit=0
+            num_correct_pairs=0
+            res=np.argsort(r)
+            for i in range(len(res)):
+                if res[i] in test:
+                    hit+=1
+                else:
+                    num_correct_pairs+=hit
+            cumu_auc+= (float)(num_correct_pairs)/((len(candidate) - len(test)) * len(test))
+            precision+=len(set(res[:10])&set(test))
+            test_case+=1
+    print 'Precision: ', precision/(10*test_case)
     print 'AUC: ', cumu_auc/test_case
 
 
@@ -242,5 +334,12 @@ if __name__ == '__main__':
 	print 'Train completed'
         print 'Prediction starts...'
         infer_personalized(data, rnn)
-	
+    elif args.module==2:
+        print 'Personalized Seq + PFP Modeling'
+        rnn=PerRNN(data,args.inputdim,args.dim)
+	personalized_pfp_train(data,args.eta,args.iters)
+	print 'Train completed'
+        print 'Prediction starts...'
+        infer_pfp(data)        
+
 
