@@ -313,7 +313,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-train', help='Training file', dest='fi', required=True)
     parser.add_argument('-split', help='Split for testing', dest='split', type=float,default=0.8)
-    parser.add_argument('-module', help='Model module, 0: non_personalized, 1: personalized, 2: collaborative, 3: MF+collaborative+personalized', dest='module', default=0, type=int)
+    parser.add_argument('-module', help='Model module, 0: non_personalized, 1: personalized, 2: PFP-AUC based, 3: MF+collaborative+personalized', dest='module', default=0, type=int)
     parser.add_argument('-inputdim', help='Dimensionality of input poi', dest='inputdim', default=10, type=int)
     parser.add_argument('-dim', help='Dimensionality of hidden layers', dest='dim', default=10, type=int)
     parser.add_argument('-eta',dest='eta',default=0.002,type=float)
