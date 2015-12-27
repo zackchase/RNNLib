@@ -38,6 +38,10 @@ class pdata(object):
                 self.ratings[user].item_set[x]=-1
         self.p_l2_norm=None
         self.u_l2_norm=None
+        self.max_check_in=0
+        for u in ratings:
+            if self.max_check_in<len(ratings[u].item_set):
+                self.max_check_in=len(ratings[u].item_set)
     def split_data(self, percentage):
         cur_test=0
         res=[]
@@ -77,13 +81,18 @@ def load_poi_data(fi,split,inputdim):
         pre_user=-1
         date='-1'
         for line in fi:
+            if not line[0].isdigit():
+                continue
             line=line[:-1]
+            #print line
             tokens = line.split('\t')
             if len(tokens)==1:
                 user=tokens[0]
+                line=fi.next()
+                if line[0]=='0':
+                    continue
                 user_hash[user]=user_hash.get(user, int(len(user_hash)))
                 user=user_hash[user]
-                line=fi.next()
                 continue
             token=tokens[1]
             time=tokens[0].split("T")[0]
@@ -106,8 +115,8 @@ def load_poi_data(fi,split,inputdim):
             if rating_count % 10000 == 0:
                 sys.stdout.write("\rReading ratings %d" % rating_count)
                 sys.stdout.flush()
-            #if rating_count>10000:
-            #    break
+#            if rating_count>2000:
+#                break
         fi.close()
         sys.stdout.write("%s reading completed\n" % fi)
         dnodex=pdata(user_hash,vocab_hash,vocab_items,poi_list,poi_track,rating_count,split,inputdim)
@@ -165,7 +174,8 @@ def personalized_pfp_train(dnodex, eta, iters):
             neg_poi=np.random.randint(dnodex.npoi)
             while neg_poi in dnodex.ratings[user].item_set:
                 neg_poi=np.random.randint(dnodex.npoi)
-            sig=T.nnet.sigmoid(T.dot(tmp_u,(dnodex.pmatrix[pos_p,:]-dnodex.pmatrix[neg_poi,:]).T))   
+            tr=T.dot(tmp_u,(dnodex.pmatrix[pos_p,:]-dnodex.pmatrix[neg_poi,:]).T)
+            sig=T.nnet.sigmoid(tr).eval()   
             bpr_loss=(1-sig)*sig
             T.set_subtensor(dnodex.pmatrix[pos_p,:],dnodex.pmatrix[pos_p,:]+eta*bpr_loss*tmp_u-eta*eta*dnodex.pmatrix[pos_p,:])
 
@@ -268,11 +278,13 @@ def infer_pfp(dnodex):
     test_case=0.000001
     cumu_auc=0.0
     for user in range(dnodex.nuser):
-        if user%100==0:
+        if user%20==0:
             sys.stdout.write('\r%d user prediction finished, p@10: %4f, AUC: %4f...' % (user,precision/(10*test_case),cumu_auc/test_case))
             sys.stdout.flush()
-        if user>=500:
+        if user>=20:
             break 
+        if len(dnodex.ratings[user].item_set)==dnodex.max_check_in:
+            continue
         candidate=range(dnodex.npoi)
         X=[]
         test=[]
@@ -283,13 +295,8 @@ def infer_pfp(dnodex):
             else:
                 test.append(p)
         if len(candidate)>0 and len(X)>0 and len(test)>0:
-            print '\n train_poi', len(X),len(candidate),len(test)
-
-            #print dnodex.pmatrix[X,:].eval()
             tmp_u=T.mean(T.dot(dnodex.pmatrix[X,:],dnodex.umatrix[user,:,:]),axis=0)
-            print len(tmp_u.eval())
             r=T.dot(tmp_u,dnodex.pmatrix[candidate,:].T).eval()
-            print 'predicted', len(r)
             hit=0
             num_correct_pairs=0
             res=np.argsort(r)
