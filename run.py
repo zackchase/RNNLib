@@ -3,6 +3,7 @@ from char_rnn import CharRNN
 from non_personalized_rnn import NonPerRNN
 from personalize_rnn import PerRNN
 from lib import one_hot, one_hot_to_string, floatX, random_weights
+from lf import LF,PFP
 import numpy as np
 import theano
 import theano.tensor as T
@@ -115,8 +116,8 @@ def load_poi_data(fi,split,inputdim):
             if rating_count % 10000 == 0:
                 sys.stdout.write("\rReading ratings %d" % rating_count)
                 sys.stdout.flush()
-#            if rating_count>2000:
-#                break
+            if rating_count>2000:
+                break
         fi.close()
         sys.stdout.write("%s reading completed\n" % fi)
         dnodex=pdata(user_hash,vocab_hash,vocab_items,poi_list,poi_track,rating_count,split,inputdim)
@@ -165,9 +166,12 @@ def personalized_pfp_train(dnodex, eta, iters):
         X = dnodex.plist[i][:-1]
         Y = dnodex.plist[i][1:]
 	user=dnodex.ptrack[i]
+        #print 'before lstm', dnodex.pmatrix[X[1],:].eval()
         lossf=str(rnn.train(X,Y,user, eta, 1.0)) 
+        #print 'After lstm ', dnodex.pmatrix[X[1],:].eval()
+        X=dnodex.ratings[user].item_set.keys()
         tmp_u=T.mean(T.dot(dnodex.pmatrix[X,:],dnodex.umatrix[user,:,:]),axis=0)
-        tmp_p=T.mean(dnodex.pmatrix[X,:],axis=0)
+        #tmp_p=T.mean(dnodex.pmatrix[X,:],axis=0)
         for pos_p in dnodex.plist[i]:
             if dnodex.ratings[user].item_set[pos_p]<0:
                 continue
@@ -176,12 +180,16 @@ def personalized_pfp_train(dnodex, eta, iters):
                 neg_poi=np.random.randint(dnodex.npoi)
             tr=T.dot(tmp_u,(dnodex.pmatrix[pos_p,:]-dnodex.pmatrix[neg_poi,:]).T)
             sig=T.nnet.sigmoid(tr).eval()   
-            bpr_loss=(1-sig)*sig
-            T.set_subtensor(dnodex.pmatrix[pos_p,:],dnodex.pmatrix[pos_p,:]+eta*bpr_loss*tmp_u-eta*eta*dnodex.pmatrix[pos_p,:])
-
-            T.set_subtensor(dnodex.pmatrix[neg_poi,:],dnodex.pmatrix[neg_poi,:]-eta*bpr_loss*tmp_u-eta*eta*dnodex.pmatrix[neg_poi,:])
-
-            T.set_subtensor(dnodex.umatrix[user,:,:],dnodex.umatrix[user,:,:]+eta*bpr_loss*T.dot(tmp_p.T,dnodex.pmatrix[pos_p,:]-dnodex.pmatrix[neg_poi,:])-eta*eta*dnodex.umatrix[user,:,:])
+            pfp_loss=(1-sig)*sig
+            #print 'pfp_loss ',pfp_loss
+            #print 'before pfp', dnodex.pmatrix[pos_p,:].eval()
+            pfp.trainpos(pos_p,neg_poi,user,eta,pfp_loss,X)
+            pfp.trainneg(neg_poi,user,eta,pfp_loss,X)
+#            T.set_subtensor(dnodex.pmatrix[pos_p,:],dnodex.pmatrix[pos_p,:]+eta*bpr_loss*tmp_u.eval()-eta*eta*dnodex.pmatrix[pos_p,:])
+            #print eta*bpr_loss*tmp_u.eval()
+            #print 'after pfp ', dnodex.pmatrix[pos_p,:].eval()
+#            T.set_subtensor(dnodex.pmatrix[neg_poi,:],dnodex.pmatrix[neg_poi,:]-eta*bpr_loss*tmp_u-eta*eta*dnodex.pmatrix[neg_poi,:])
+#            T.set_subtensor(dnodex.umatrix[user,:,:],dnodex.umatrix[user,:,:]+eta*bpr_loss*T.dot(tmp_p.T,dnodex.pmatrix[pos_p,:]-dnodex.pmatrix[neg_poi,:])-eta*eta*dnodex.umatrix[user,:,:])
 
         if it%500==0:
             sys.stdout.write("\riteration: %s..." % (str(it)))
@@ -344,7 +352,8 @@ if __name__ == '__main__':
     elif args.module==2:
         print 'Personalized Seq + PFP Modeling'
         rnn=PerRNN(data,args.inputdim,args.dim)
-	personalized_pfp_train(data,args.eta,args.iters)
+	pfp=PFP(data)
+        personalized_pfp_train(data,args.eta,args.iters)
 	print 'Train completed'
         print 'Prediction starts...'
         infer_pfp(data)        
