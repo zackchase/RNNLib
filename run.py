@@ -179,7 +179,6 @@ def bpr_train(dnodex, eta, iters):
         if it%500==0:
             sys.stdout.write("\riteration: %s..." % (str(it)))
             sys.stdout.flush()
-            #infer_stochastic(dnodex,rnn)
 
 def non_personalized_bpr_train(dnodex, eta, iters):
     for it in xrange(iters):
@@ -204,7 +203,6 @@ def non_personalized_bpr_train(dnodex, eta, iters):
         if it%500==0:
             sys.stdout.write("\riteration: %s..." % (str(it)))
             sys.stdout.flush()
-            #infer_stochastic(dnodex,rnn)
 
 
 
@@ -213,16 +211,12 @@ def personalized_pfp_train(dnodex, eta, iters):
         i = random.randint(0,len(dnodex.plist)-1)
         while len(dnodex.plist[i])<=2 or i in dnodex.test_track:
             i=random.randint(0,len(dnodex.plist)-1)
-#        print len(dnodex.plist[i])
         X = dnodex.plist[i][:-1]
         Y = dnodex.plist[i][1:]
 	user=dnodex.ptrack[i]
-        #print 'before lstm', dnodex.pmatrix[X[1],:].eval()
         lossf=str(rnn.train(X,Y,user, eta, 1.0)) 
-        #print 'After lstm ', dnodex.pmatrix[X[1],:].eval()
         X=dnodex.ratings[user].item_set.keys()
         tmp_u=T.mean(T.dot(dnodex.pmatrix[X,:],dnodex.umatrix[user,:,:]),axis=0)
-        #tmp_p=T.mean(dnodex.pmatrix[X,:],axis=0)
         for pos_p in dnodex.plist[i]:
             if dnodex.ratings[user].item_set[pos_p]<0:
                 continue
@@ -232,20 +226,12 @@ def personalized_pfp_train(dnodex, eta, iters):
             tr=T.dot(tmp_u,(dnodex.pmatrix[pos_p,:]-dnodex.pmatrix[neg_poi,:]).T)
             sig=T.nnet.sigmoid(tr).eval()   
             pfp_loss=(1-sig)*sig
-            #print 'pfp_loss ',pfp_loss
-            #print 'before pfp', dnodex.pmatrix[pos_p,:].eval()
             pfp.trainpos(pos_p,neg_poi,user,eta,pfp_loss,X)
             pfp.trainneg(neg_poi,user,eta,pfp_loss,X)
-#            T.set_subtensor(dnodex.pmatrix[pos_p,:],dnodex.pmatrix[pos_p,:]+eta*bpr_loss*tmp_u.eval()-eta*eta*dnodex.pmatrix[pos_p,:])
-            #print eta*bpr_loss*tmp_u.eval()
-            #print 'after pfp ', dnodex.pmatrix[pos_p,:].eval()
-#            T.set_subtensor(dnodex.pmatrix[neg_poi,:],dnodex.pmatrix[neg_poi,:]-eta*bpr_loss*tmp_u-eta*eta*dnodex.pmatrix[neg_poi,:])
-#            T.set_subtensor(dnodex.umatrix[user,:,:],dnodex.umatrix[user,:,:]+eta*bpr_loss*T.dot(tmp_p.T,dnodex.pmatrix[pos_p,:]-dnodex.pmatrix[neg_poi,:])-eta*eta*dnodex.umatrix[user,:,:])
 
         if it%500==0:
             sys.stdout.write("\riteration: %s..." % (str(it)))
             sys.stdout.flush()
-            #infer_stochastic(dnodex,rnn)
 
 
 
@@ -255,13 +241,11 @@ def non_personalized_train(dnodex, eta, iters):
         i = random.randint(0,len(dnodex.plist)-1)
         while len(dnodex.plist[i])<=2 or i in dnodex.test_track:
             i=random.randint(0,len(dnodex.plist)-1)
-#        print len(dnodex.plist[i])
         X = dnodex.plist[i][:-1]
         Y = dnodex.plist[i][1:]
         lossf=str(rnn.train(one_hot(X,len(format(dnodex.npoi,'b'))), one_hot(Y,len(format(dnodex.npoi,'b'))), eta, 1.0))
         if it%500==0:
             print "iteration: %s, cost: %s" % (str(it), lossf)
-            #infer_stochastic(dnodex,rnn)
 
 def infer_stochastic(dnodex, rnn):
     precision=0
@@ -274,17 +258,13 @@ def infer_stochastic(dnodex, rnn):
         if test_index>=500:
             break
         if len(test)==1:
-            #precision+=1
-            #test_case+=1
             continue
         for index in range(len(test)-1):
             x = [one_hot([test[index]],len(format(dnodex.npoi,'b'))).flatten()]
             probs = rnn.predict_char(x, 1)
-            #print probs
             p = np.asarray(probs[0], dtype="float64")
             p /= p.sum()
             sample = np.random.multinomial(len(p), p)
-            #print sample
             res=one_hot_to_string(sample)
             if res==test[index+1]:
                 precision+=1.0
@@ -306,14 +286,10 @@ def infer_personalized(dnodex, rnn):
         if test_index>=500:
             break
         if len(test)==1:
-            #precision+=1
-            #test_case+=1
             continue
         for index in range(len(test)-1):
             x=test[index]#dnodex.pmatrix[test[index],:] #= [one_hot([test[index]],len(format(dnodex.npoi,'b'))).flatten()]
-            #print x, tuser
             probs = rnn.predict_char([x],tuser, 1)
-            #print probs
             r=T.dot(probs,T.dot(dnodex.pmatrix, dnodex.umatrix[tuser,:,:]).transpose()).eval()
             hit=0
             num_correct_pairs=0
