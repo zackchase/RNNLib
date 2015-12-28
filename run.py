@@ -162,13 +162,10 @@ def non_personalized_bpr_train(dnodex, eta, iters):
         i = random.randint(0,len(dnodex.plist)-1)
         while len(dnodex.plist[i])<=2 or i in dnodex.test_track:
             i=random.randint(0,len(dnodex.plist)-1)
-#        print len(dnodex.plist[i])
         X = dnodex.plist[i][:-1]
         Y = dnodex.plist[i][1:]
 	user=dnodex.ptrack[i]
-        #print 'before lstm', dnodex.pmatrix[X[1],:].eval()
         lossf=str(rnn.train(X,Y, eta, 1.0)) 
-        #print 'After lstm ', dnodex.pmatrix[X[1],:].eval()
         for pos_p in dnodex.plist[i]:
             if dnodex.ratings[user].item_set[pos_p]<0:
                 continue
@@ -178,16 +175,8 @@ def non_personalized_bpr_train(dnodex, eta, iters):
 	    tr=T.dot(dnodex.umatrix[user,:],(dnodex.pmatrix[pos_p,:]-dnodex.pmatrix[neg_poi,:]).T)
             sig=T.nnet.sigmoid(tr).eval()   
             bpr_loss=(1-sig)*sig
-            print 'bpr_loss ',bpr_loss
-            print 'before bpr', dnodex.pmatrix[pos_p,:].eval()
             bpr.trainpos(pos_p,neg_poi,user,eta,bpr_loss)
             bpr.trainneg(neg_poi,user,eta,bpr_loss)
-#            T.set_subtensor(dnodex.pmatrix[pos_p,:],dnodex.pmatrix[pos_p,:]+eta*bpr_loss*tmp_u.eval()-eta*eta*dnodex.pmatrix[pos_p,:])
-            #print eta*bpr_loss*tmp_u.eval()
-            print 'after bpr ', dnodex.pmatrix[pos_p,:].eval()
-#            T.set_subtensor(dnodex.pmatrix[neg_poi,:],dnodex.pmatrix[neg_poi,:]-eta*bpr_loss*tmp_u-eta*eta*dnodex.pmatrix[neg_poi,:])
-#            T.set_subtensor(dnodex.umatrix[user,:,:],dnodex.umatrix[user,:,:]+eta*bpr_loss*T.dot(tmp_p.T,dnodex.pmatrix[pos_p,:]-dnodex.pmatrix[neg_poi,:])-eta*eta*dnodex.umatrix[user,:,:])
-
         if it%500==0:
             sys.stdout.write("\riteration: %s..." % (str(it)))
             sys.stdout.flush()
