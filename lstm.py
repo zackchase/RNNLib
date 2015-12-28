@@ -109,6 +109,18 @@ class FullyConnectedLayer(NNLayer):
     def output(self):
         return
 
+class InputNPLayer(NNLayer):
+    """
+    """
+    def __init__(self, X, name=""):
+        self.name = name
+        self.params=[]
+	self.X = X#theano.shared(X)
+        self.params=[X]
+    def output(self):
+        return self.X
+
+
 class InputPLayer(NNLayer):
     """
     """
@@ -133,6 +145,23 @@ class InputLayer(NNLayer):
 
     def output(self):
         return self.X
+
+class SoftmaxNPLayer(NNLayer):
+    """
+    """
+    def __init__(self, num_input, num_output, input_layer, temperature=1.0, name=""):
+        self.name = ""
+        self.X = input_layer.output()
+        self.params = []
+        self.temp = temperature
+        self.W_yh = random_weights((num_input, num_output))
+        self.b_y = zeros(num_output)
+
+        self.params = [self.W_yh, self.b_y]
+
+    def output(self):
+        return softmax((T.dot(self.X, self.W_yh) + self.b_y), temperature=self.temp)
+
 
 
 class SoftmaxPLayer(NNLayer):

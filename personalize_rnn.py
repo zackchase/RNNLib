@@ -32,7 +32,7 @@ class PerRNN:
         #caches = make_caches(params)
 
 	cost = T.mean(T.nnet.categorical_crossentropy(Y_hat, T.dot(dnodex.pmatrix[Y,:],dnodex.umatrix[Z,:,:])))+eta*dnodex.p_l2_norm+eta*dnodex.u_l2_norm
-        updates = PerSGD(cost,params,eta,X,Z,self.dnodex)#momentum(cost, params, caches, eta)
+        updates = PerSGD(cost,params,eta,X,Z,dnodex)#momentum(cost, params, caches, eta)
 
         self.train = theano.function([X,Y,Z, eta, temperature], cost, updates=updates, allow_input_downcast=True)
 

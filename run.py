@@ -3,7 +3,7 @@ from char_rnn import CharRNN
 from non_personalized_rnn import NonPerRNN
 from personalize_rnn import PerRNN
 from lib import one_hot, one_hot_to_string, floatX, random_weights
-from lf import LF,PFP
+from lf import LF,PFP,BPR
 import numpy as np
 import theano
 import theano.tensor as T
@@ -157,6 +157,44 @@ def personalized_pmf_train(dnodex, eta, iters):
             print "iteration: %s, cost: %s" % (str(it), lossf)
             #infer_stochastic(dnodex,rnn)
 
+def non_personalized_bpr_train(dnodex, eta, iters):
+    for it in xrange(iters):
+        i = random.randint(0,len(dnodex.plist)-1)
+        while len(dnodex.plist[i])<=2 or i in dnodex.test_track:
+            i=random.randint(0,len(dnodex.plist)-1)
+#        print len(dnodex.plist[i])
+        X = dnodex.plist[i][:-1]
+        Y = dnodex.plist[i][1:]
+	user=dnodex.ptrack[i]
+        #print 'before lstm', dnodex.pmatrix[X[1],:].eval()
+        lossf=str(rnn.train(X,Y, eta, 1.0)) 
+        #print 'After lstm ', dnodex.pmatrix[X[1],:].eval()
+        for pos_p in dnodex.plist[i]:
+            if dnodex.ratings[user].item_set[pos_p]<0:
+                continue
+            neg_poi=np.random.randint(dnodex.npoi)
+            while neg_poi in dnodex.ratings[user].item_set:
+                neg_poi=np.random.randint(dnodex.npoi)
+	    tr=T.dot(dnodex.umatrix[user,:],(dnodex.pmatrix[pos_p,:]-dnodex.pmatrix[neg_poi,:]).T)
+            sig=T.nnet.sigmoid(tr).eval()   
+            bpr_loss=(1-sig)*sig
+            print 'bpr_loss ',bpr_loss
+            print 'before bpr', dnodex.pmatrix[pos_p,:].eval()
+            bpr.trainpos(pos_p,neg_poi,user,eta,bpr_loss)
+            bpr.trainneg(neg_poi,user,eta,bpr_loss)
+#            T.set_subtensor(dnodex.pmatrix[pos_p,:],dnodex.pmatrix[pos_p,:]+eta*bpr_loss*tmp_u.eval()-eta*eta*dnodex.pmatrix[pos_p,:])
+            #print eta*bpr_loss*tmp_u.eval()
+            print 'after bpr ', dnodex.pmatrix[pos_p,:].eval()
+#            T.set_subtensor(dnodex.pmatrix[neg_poi,:],dnodex.pmatrix[neg_poi,:]-eta*bpr_loss*tmp_u-eta*eta*dnodex.pmatrix[neg_poi,:])
+#            T.set_subtensor(dnodex.umatrix[user,:,:],dnodex.umatrix[user,:,:]+eta*bpr_loss*T.dot(tmp_p.T,dnodex.pmatrix[pos_p,:]-dnodex.pmatrix[neg_poi,:])-eta*eta*dnodex.umatrix[user,:,:])
+
+        if it%500==0:
+            sys.stdout.write("\riteration: %s..." % (str(it)))
+            sys.stdout.flush()
+            #infer_stochastic(dnodex,rnn)
+
+
+
 def personalized_pfp_train(dnodex, eta, iters):
     for it in xrange(iters):
         i = random.randint(0,len(dnodex.plist)-1)
@@ -281,6 +319,45 @@ def infer_personalized(dnodex, rnn):
     print 'AUC: ', cumu_auc/test_case
 
 
+def infer_bpr(dnodex):
+    precision=0.0
+    test_case=0.000001
+    cumu_auc=0.0
+    for user in range(dnodex.nuser):
+        if user%20==0:
+            sys.stdout.write('\r%d user prediction finished, p@10: %4f, AUC: %4f...' % (user,precision/(10*test_case),cumu_auc/test_case))
+            sys.stdout.flush()
+        if user>=20:
+            break 
+        if len(dnodex.ratings[user].item_set)==dnodex.max_check_in:
+            continue
+        candidate=range(dnodex.npoi)
+        X=[]
+        test=[]
+        for p in dnodex.ratings[user].item_set:
+            if dnodex.ratings[user].item_set[p]>0:
+                candidate.remove(p)
+                X.append(p)
+            else:
+                test.append(p)
+        if len(candidate)>0 and len(X)>0 and len(test)>0:
+	    r=T.dot(dnodex.umatrix[user,:],dnodex.pmatrix[candidate,:].T).eval()
+            hit=0
+            num_correct_pairs=0
+            res=np.argsort(r)
+            for i in range(len(res)):
+                if res[i] in test:
+                    hit+=1
+                else:
+                    num_correct_pairs+=hit
+            cumu_auc+= (float)(num_correct_pairs)/((len(candidate) - len(test)) * len(test))
+            precision+=len(set(res[:10])&set(test))
+            test_case+=1
+    print 'Precision: ', precision/(10*test_case)
+    print 'AUC: ', cumu_auc/test_case
+
+
+
 def infer_pfp(dnodex):
     precision=0.0
     test_case=0.000001
@@ -328,7 +405,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-train', help='Training file', dest='fi', required=True)
     parser.add_argument('-split', help='Split for testing', dest='split', type=float,default=0.8)
-    parser.add_argument('-module', help='Model module, 0: non_personalized, 1: personalized, 2: PFP-AUC based, 3: MF+collaborative+personalized', dest='module', default=0, type=int)
+    parser.add_argument('-module', help='Model module, 0: Non_personalized LSTM, 1: Personalized LSTM, 2: PFP-AUC+Personalized LSTM, 3: BPR+Non_personalized LSTM', dest='module', default=0, type=int)
     parser.add_argument('-inputdim', help='Dimensionality of input poi', dest='inputdim', default=10, type=int)
     parser.add_argument('-dim', help='Dimensionality of hidden layers', dest='dim', default=10, type=int)
     parser.add_argument('-eta',dest='eta',default=0.002,type=float)
@@ -357,5 +434,11 @@ if __name__ == '__main__':
 	print 'Train completed'
         print 'Prediction starts...'
         infer_pfp(data)        
-
-
+    elif args.module==3:
+	print 'BPR+Non-personalized Modeling'
+	rnn=NonPerRNN(data,args.inputdim,args.dim)
+	bpr=BPR(data)
+	non_personalized_bpr_train(data,args.eta,args.iters)
+	print 'Train completed'
+        print 'Prediction starts...'
+        infer_bpr(data)        
