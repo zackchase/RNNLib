@@ -116,8 +116,8 @@ def load_poi_data(fi,split,inputdim):
             if rating_count % 10000 == 0:
                 sys.stdout.write("\rReading ratings %d" % rating_count)
                 sys.stdout.flush()
-            if rating_count>2000:
-                break
+            #if rating_count>2000:
+            #    break
         fi.close()
         sys.stdout.write("%s reading completed\n" % fi)
         dnodex=pdata(user_hash,vocab_hash,vocab_items,poi_list,poi_track,rating_count,split,inputdim)
