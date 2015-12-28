@@ -157,6 +157,30 @@ def personalized_pmf_train(dnodex, eta, iters):
             print "iteration: %s, cost: %s" % (str(it), lossf)
             #infer_stochastic(dnodex,rnn)
 
+def bpr_train(dnodex, eta, iters):
+    for it in xrange(iters):
+        i = random.randint(0,len(dnodex.plist)-1)
+        while len(dnodex.plist[i])<=2 or i in dnodex.test_track:
+            i=random.randint(0,len(dnodex.plist)-1)
+        X = dnodex.plist[i][:-1]
+        Y = dnodex.plist[i][1:]
+	user=dnodex.ptrack[i]
+        for pos_p in dnodex.plist[i]:
+            if dnodex.ratings[user].item_set[pos_p]<0:
+                continue
+            neg_poi=np.random.randint(dnodex.npoi)
+            while neg_poi in dnodex.ratings[user].item_set:
+                neg_poi=np.random.randint(dnodex.npoi)
+	    tr=T.dot(dnodex.umatrix[user,:],(dnodex.pmatrix[pos_p,:]-dnodex.pmatrix[neg_poi,:]).T)
+            sig=T.nnet.sigmoid(tr).eval()   
+            bpr_loss=(1-sig)*sig
+            bpr.trainpos(pos_p,neg_poi,user,eta,bpr_loss)
+            bpr.trainneg(neg_poi,user,eta,bpr_loss)
+        if it%500==0:
+            sys.stdout.write("\riteration: %s..." % (str(it)))
+            sys.stdout.flush()
+            #infer_stochastic(dnodex,rnn)
+
 def non_personalized_bpr_train(dnodex, eta, iters):
     for it in xrange(iters):
         i = random.randint(0,len(dnodex.plist)-1)
@@ -394,7 +418,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-train', help='Training file', dest='fi', required=True)
     parser.add_argument('-split', help='Split for testing', dest='split', type=float,default=0.8)
-    parser.add_argument('-module', help='Model module, 0: Non_personalized LSTM, 1: Personalized LSTM, 2: PFP-AUC+Personalized LSTM, 3: BPR+Non_personalized LSTM', dest='module', default=0, type=int)
+    parser.add_argument('-module', help='Model module, 0: Non_personalized LSTM, 1: Personalized LSTM, 2: PFP-AUC+Personalized LSTM, 3: BPR+Non_personalized LSTM, 4: BPR', dest='module', default=0, type=int)
     parser.add_argument('-inputdim', help='Dimensionality of input poi', dest='inputdim', default=10, type=int)
     parser.add_argument('-dim', help='Dimensionality of hidden layers', dest='dim', default=10, type=int)
     parser.add_argument('-eta',dest='eta',default=0.002,type=float)
@@ -418,7 +442,7 @@ if __name__ == '__main__':
     elif args.module==2:
         print 'Personalized Seq + PFP Modeling'
         rnn=PerRNN(data,args.inputdim,args.dim)
-	pfp=PFP(data)
+	pfp=PFP(data,args.inputdim)
         personalized_pfp_train(data,args.eta,args.iters)
 	print 'Train completed'
         print 'Prediction starts...'
@@ -426,8 +450,15 @@ if __name__ == '__main__':
     elif args.module==3:
 	print 'BPR+Non-personalized Modeling'
 	rnn=NonPerRNN(data,args.inputdim,args.dim)
-	bpr=BPR(data)
+	bpr=BPR(data,args.inputdim)
 	non_personalized_bpr_train(data,args.eta,args.iters)
 	print 'Train completed'
         print 'Prediction starts...'
-        infer_bpr(data)        
+        infer_bpr(data)       
+    elif args.module==4:
+        print 'BPR'
+        bpr=BPR(data,args.inputdim)
+        bpr_train(data,args.eta,args.iters)
+        print 'Train completed'
+        print 'Prediction starts...'
+        infer_bpr(data)
