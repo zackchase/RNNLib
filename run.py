@@ -293,7 +293,7 @@ def infer_personalized(dnodex, rnn):
             r=T.dot(probs,T.dot(dnodex.pmatrix, dnodex.umatrix[tuser,:,:]).transpose()).eval()
             hit=0
             num_correct_pairs=0
-            res=np.argsort(r[0])
+            res=np.argsort(r[0])[::-1]
             for i in range(len(res)):
                 if res[i] in test:
                     hit+=1
@@ -333,7 +333,7 @@ def infer_bpr(dnodex):
 	    r=T.dot(dnodex.umatrix[user,:],dnodex.pmatrix[candidate,:].T).eval()
             hit=0
             num_correct_pairs=0
-            res=np.argsort(r)
+            res=np.argsort(r)[::-1]
             for i in range(len(res)):
                 if res[i] in test:
                     hit+=1
@@ -373,7 +373,7 @@ def infer_pfp(dnodex):
             r=T.dot(tmp_u,dnodex.pmatrix[candidate,:].T).eval()
             hit=0
             num_correct_pairs=0
-            res=np.argsort(r)
+            res=np.argsort(r)[::-1]
             for i in range(len(res)):
                 if res[i] in test:
                     hit+=1
