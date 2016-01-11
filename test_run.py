@@ -3,7 +3,7 @@ import argparse
 from char_rnn import CharRNN
 from non_personalized_rnn import NonPerRNN
 from personalize_bpr_rnn import PerRNN
-from lib import one_hot, one_hot_to_string, floatX, random_weights,sigmoid_loss, sigmoid
+from lib import one_hot, one_hot_to_string, floatX, random_weights,sigmoid
 from lf import LF,PFP,BPR
 import numpy as np
 import theano
