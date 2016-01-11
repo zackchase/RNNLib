@@ -1,8 +1,9 @@
+import time
 import argparse
 from char_rnn import CharRNN
 from non_personalized_rnn import NonPerRNN
-from personalize_rnn import PerRNN
-from lib import one_hot, one_hot_to_string, floatX, random_weights
+from personalize_bpr_rnn import PerRNN
+from lib import one_hot, one_hot_to_string, floatX, random_weights,sigmoid_loss, sigmoid
 from lf import LF,PFP,BPR
 import numpy as np
 import theano
@@ -130,8 +131,8 @@ def load_poi_data(fi,split,inputdim):
             if rating_count % 10000 == 0:
                 sys.stdout.write("\rReading ratings %d" % rating_count)
                 sys.stdout.flush()
-            if rating_count>500:
-                break
+           # if rating_count>5000:
+           #     break
         fi.close()
         sys.stdout.write("%s reading completed\n" % fi)
         dnodex=pdata(user_hash,vocab_hash,vocab_items,poi_list,poi_track,rating_count,split,inputdim)
@@ -218,7 +219,6 @@ def non_personalized_bpr_train(dnodex, eta, iters):
             sys.stdout.flush()
 
 
-
 def personalized_pfp_train(dnodex, eta, iters):
     p1=[]
     for x in range(len(dnodex.plist)):
@@ -230,26 +230,28 @@ def personalized_pfp_train(dnodex, eta, iters):
             i=random.choice(p1)
         X = dnodex.plist[i][:-1]
         Y = dnodex.plist[i][1:]
-	user=dnodex.ptrack[i]
-        lossf=str(rnn.train(X,Y,user, eta, 1.0)) 
-        X=dnodex.ratings[user].item_set.keys()
-        tmp_u=T.mean(T.dot(dnodex.pmatrix[X,:],dnodex.umatrix[user,:,:]),axis=0)
-        for pos_p in dnodex.plist[i]:
+        NP=[]
+        user=dnodex.ptrack[i]
+        for pos_p in X:
             if dnodex.ratings[user].item_set[pos_p]<0:
-                continue
-            neg_poi=np.random.randint(dnodex.npoi)
+                X.remove(pos_p)
+                if pos_p in Y:
+                    Y.remove(pos_p)
+        if len(X)!=len(Y):
+            Y=Y[1:]
+	while len(NP)!=len(X):
+	    neg_poi=np.random.randint(dnodex.npoi)
             while neg_poi in dnodex.ratings[user].item_set:
                 neg_poi=np.random.randint(dnodex.npoi)
-            tr=T.dot(tmp_u,(dnodex.pmatrix[pos_p,:]-dnodex.pmatrix[neg_poi,:]).T)
-            sig=T.nnet.sigmoid(tr).eval()   
-            pfp_loss=(1-sig)*sig
-            pfp.trainpos(pos_p,neg_poi,user,eta,pfp_loss,X)
-            pfp.trainneg(neg_poi,user,eta,pfp_loss,X)
-        if it%5000==0:
-            sys.stdout.write("\niteration: %s..." % (str(it)))
-            print AUC_metric(dnodex,rnn)
+            NP.append(neg_poi)
+        if len(NP)==0:
+            continue
+        lossf=str(rnn.train(X,Y,user, eta, 1.0)) 
+        tmp_u= rnn.trainneg(X,NP,user,eta)
+        pfp_loss= rnn.trainpos(X,NP,user,eta)
+        if it!=0 and it%10000==0:
+            sys.stdout.write('\n%d iterations...%4f'%(it,AUC_metric(dnodex,rnn)))
             sys.stdout.flush()
-
 
 
 
@@ -445,7 +447,7 @@ if __name__ == '__main__':
     data = load_poi_data(args.fi,args.split,args.inputdim)
     if args.module==0:
 	print 'Non_personalized Seq Modeling'
-        rnn=NonPerRNN(data,args.dim)
+        rnn=NonPerRNN(data,args.inputdim,args.dim)
     	non_personalized_train(data,args.eta,args.iters)
 	print 'Train completed'
         print 'Prediction starts...'
@@ -461,8 +463,11 @@ if __name__ == '__main__':
         print 'Personalized Seq + PFP Modeling'
         rnn=PerRNN(data,args.inputdim,args.dim)
 	pfp=PFP(data,args.inputdim)
+        t1=time.time()
         personalized_pfp_train(data,args.eta,args.iters)
-	print 'Train completed'
+	t2=time.time()
+        print 'Train completed'
+        print t2-t1
         print 'Prediction starts...'
         infer_pfp(data)        
     elif args.module==3:
