@@ -2,7 +2,7 @@ import numpy as np
 import theano
 import theano.tensor as T
 from lstm import InputPLayer, SoftmaxPLayer, LSTMLayer, SoftmaxLayer
-from lib import  floatX, make_caches, get_params, SGD, PerSGD, momentum, one_step_updates,random_weights, sigmoid_loss,sigmoid
+from lib import  floatX, make_caches, get_params, SGD, PerSGD, momentum, one_step_updates,random_weights, sigmoid
 
 class PerRNN:
     def __init__(self, dnodex,inputdim,dim):

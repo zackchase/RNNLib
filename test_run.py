@@ -249,9 +249,9 @@ def personalized_pfp_train(dnodex, eta, iters):
         lossf=str(rnn.train(X,Y,user, eta, 1.0)) 
         tmp_u= rnn.trainneg(X,NP,user,eta)
         pfp_loss= rnn.trainpos(X,NP,user,eta)
-        if it!=0 and it%10000==0:
-            sys.stdout.write('\n%d iterations...%4f'%(it,AUC_metric(dnodex,rnn)))
-            sys.stdout.flush()
+        #if it!=0 and it%10000==0:
+        #    sys.stdout.write('\n%d iterations...%4f'%(it,AUC_metric(dnodex,rnn)))
+        #    sys.stdout.flush()
 
 
 
