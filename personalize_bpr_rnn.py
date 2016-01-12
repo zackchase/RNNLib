@@ -40,7 +40,7 @@ class PerRNN:
 	cost = eta*T.mean(T.nnet.categorical_crossentropy(Y_hat, T.dot(dnodex.pmatrix[Y,:],dnodex.umatrix[Z,:,:])))+eta*dnodex.p_l2_norm+eta*dnodex.u_l2_norm
         updates = PerSGD(cost,params,eta,X,Z,dnodex)#momentum(cost, params, caches, eta)
 
-    	
+        rlist=T.argsort(T.dot(tmp_u,dnodex.pmatrix.T))[::-1]
         n_updates=[(dnodex.pmatrix, T.set_subtensor(dnodex.pmatrix[NP,:],dnodex.pmatrix[NP,:]-eta*pfp_lossv*tmp_u1-eta*eta*dnodex.pmatrix[NP,:]))]
 	p_updates=[(dnodex.pmatrix, T.set_subtensor(dnodex.pmatrix[X,:],dnodex.pmatrix[X,:]+eta*pfp_lossv*tmp_u1-eta*eta*dnodex.pmatrix[X,:])),(dnodex.umatrix, T.set_subtensor(dnodex.umatrix[Z,:,:],dnodex.umatrix[Z,:,:]+eta*T.mean(pfp_loss)*(T.reshape(tmp_u,(tmp_u.shape[0],1))*T.mean(dnodex.pmatrix[X,:]-dnodex.pmatrix[NP,:],axis=0)))-eta*eta*dnodex.umatrix[Z,:,:])]
         
@@ -48,9 +48,8 @@ class PerRNN:
         self.trainpos=theano.function([X,NP,Z,eta],tmp_u, updates=p_updates,allow_input_downcast=True)
         self.trainneg=theano.function([X,NP,Z,eta],T.mean(pfp_loss), updates=n_updates,allow_input_downcast=True)
         
-        predict_updates = one_step_updates(self.layers)
         
-        self.predict_char = theano.function([X, Z, temperature], Y_hat, updates=predict_updates, allow_input_downcast=True)
+        self.predict_pfp = theano.function([X,Z], rlist, allow_input_downcast=True)
 
     def reset_state(self):
         for layer in self.layers:

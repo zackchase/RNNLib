@@ -131,8 +131,8 @@ def load_poi_data(fi,split,inputdim):
             if rating_count % 10000 == 0:
                 sys.stdout.write("\rReading ratings %d" % rating_count)
                 sys.stdout.flush()
-        #    if rating_count>5000:
-        #        break
+#            if rating_count>5000:
+#                break
         fi.close()
         sys.stdout.write("%s reading completed\n" % fi)
         dnodex=pdata(user_hash,vocab_hash,vocab_items,poi_list,poi_track,rating_count,split,inputdim)
@@ -404,27 +404,24 @@ def infer_pfp(dnodex):
         if user%20==0:
             sys.stdout.write('\r%d user prediction finished, p@10: %4f, AUC: %4f...' % (user,precision/(10*test_case),cumu_auc/test_case))
             sys.stdout.flush()
-        candidate=range(dnodex.npoi)
         X=[]
         test=[]
         for p in dnodex.ratings[user].item_set:
             if dnodex.ratings[user].item_set[p]>0:
-                candidate.remove(p)
                 X.append(p)
             else:
                 test.append(p)
-        if len(candidate)>0 and len(X)>0 and len(test)>0:
-            tmp_u=T.mean(T.dot(dnodex.pmatrix[X,:],dnodex.umatrix[user,:,:]),axis=0)
-            r=T.dot(tmp_u,dnodex.pmatrix[candidate,:].T).eval()
-            hit=0
+        if len(X)>0 and len(test)>0:
+	    hit=0
             num_correct_pairs=0
-            res=np.argsort(r)[::-1]
-            for i in range(len(res)):
+            r=rnn.predict_pfp(X,user)
+	    res=[x1 for x1 in r if x1 not in X]
+	    for i in range(len(res)):
                 if res[i] in test:
                     hit+=1
                 else:
                     num_correct_pairs+=hit
-            cumu_auc+= (float)(num_correct_pairs)/((len(candidate) - len(test)) * len(test))
+            cumu_auc+= (float)(num_correct_pairs)/((dnodex.npoi-len(X) - len(test)) * len(test))
             precision+=len(set(res[:10])&set(test))
             test_case+=1
     print '\nPrecision: ', precision/(10*test_case)
