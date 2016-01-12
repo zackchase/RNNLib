@@ -144,18 +144,39 @@ def load_poi_data(fi,split,inputdim):
         return dnodex
 
 def personalized_train(dnodex, eta, iters):
+    p={}
+    for x in range(len(dnodex.plist)):
+        p[dnodex.ptrack[x]]=p.get(dnodex.ptrack[x],[])
+        p[dnodex.ptrack[x]].append(x)
     for it in xrange(iters):
-        i = random.randint(0,len(dnodex.plist)-1)
-        while len(dnodex.plist[i])<=2 or i in dnodex.test_track:
-            i=random.randint(0,len(dnodex.plist)-1)
-#        print len(dnodex.plist[i])
-        X = dnodex.plist[i][:-1]
-        Y = dnodex.plist[i][1:]
-	user=dnodex.ptrack[i]
-        lossf=str(rnn.train(X,Y,user, eta, 1.0))
-        if it%500==0:
-            print "iteration: %s, cost: %s" % (str(it), lossf)
-            #infer_stochastic(dnodex,rnn)
+        for user in xrange(dnodex.nuser):
+            if user not in p or len(p[user])==0:
+                continue
+            i=random.choice(p[user])
+            if len(dnodex.plist[i])<2:
+                continue
+            X = dnodex.plist[i][:-1]
+            Y = dnodex.plist[i][1:]
+            NP=[]
+            user=dnodex.ptrack[i]
+            for pos_p in X:
+                if dnodex.ratings[user].item_set[pos_p]<0:
+                    X.remove(pos_p)
+                    if pos_p in Y:
+                        Y.remove(pos_p)
+            if len(X)!=len(Y):
+                Y=Y[1:]
+	    while len(NP)!=len(X):
+	        neg_poi=np.random.randint(dnodex.npoi)
+                while neg_poi in dnodex.ratings[user].item_set:
+                    neg_poi=np.random.randint(dnodex.npoi)
+                NP.append(neg_poi)
+            if len(NP)==0:
+                continue
+            lossf=str(rnn.train(X,Y,user, eta, 1.0)) 
+        if it%10000==0:
+            sys.stdout.write('\r%d iterations...'%(it))
+            sys.stdout.flush()
 
 def personalized_pmf_train(dnodex, eta, iters):
     for it in xrange(iters):
@@ -172,50 +193,67 @@ def personalized_pmf_train(dnodex, eta, iters):
             #infer_stochastic(dnodex,rnn)
 
 def bpr_train(dnodex, eta, iters):
+    p={}
+    for x in range(len(dnodex.plist)):
+        p[dnodex.ptrack[x]]=p.get(dnodex.ptrack[x],[])
+        p[dnodex.ptrack[x]].append(x)
     for it in xrange(iters):
-        i = random.randint(0,len(dnodex.plist)-1)
-        while len(dnodex.plist[i])<=2 or i in dnodex.test_track:
-            i=random.randint(0,len(dnodex.plist)-1)
-        X = dnodex.plist[i][:-1]
-        Y = dnodex.plist[i][1:]
-	user=dnodex.ptrack[i]
-        for pos_p in dnodex.plist[i]:
-            if dnodex.ratings[user].item_set[pos_p]<0:
+        for user in xrange(dnodex.nuser):
+            if user not in p or len(p[user])==0:
                 continue
-            neg_poi=np.random.randint(dnodex.npoi)
-            while neg_poi in dnodex.ratings[user].item_set:
-                neg_poi=np.random.randint(dnodex.npoi)
-	    tr=T.dot(dnodex.umatrix[user,:],(dnodex.pmatrix[pos_p,:]-dnodex.pmatrix[neg_poi,:]).T)
-            sig=T.nnet.sigmoid(tr).eval()   
-            bpr_loss=(1-sig)*sig
-            bpr.trainpos(pos_p,neg_poi,user,eta,bpr_loss)
-            bpr.trainneg(neg_poi,user,eta,bpr_loss)
-        if it%500==0:
-            sys.stdout.write("\riteration: %s..." % (str(it)))
+            i=random.choice(p[user])
+            X = dnodex.plist[i]
+            NP=[]
+            user=dnodex.ptrack[i]
+            for pos_p in X:
+                if dnodex.ratings[user].item_set[pos_p]<0:
+                    X.remove(pos_p)
+	    while len(NP)!=len(X):
+	        neg_poi=np.random.randint(dnodex.npoi)
+                while neg_poi in dnodex.ratings[user].item_set:
+                    neg_poi=np.random.randint(dnodex.npoi)
+                NP.append(neg_poi)
+            tmp_u= rnn.trainneg(X,NP,user,eta)
+            pfp_loss= rnn.trainpos(X,NP,user,eta)
+        if it%10000==0:
+            sys.stdout.write('\r%d iterations...'%(it))
             sys.stdout.flush()
 
 def non_personalized_bpr_train(dnodex, eta, iters):
+    p={}
+    for x in range(len(dnodex.plist)):
+        p[dnodex.ptrack[x]]=p.get(dnodex.ptrack[x],[])
+        p[dnodex.ptrack[x]].append(x)
     for it in xrange(iters):
-        i = random.randint(0,len(dnodex.plist)-1)
-        while len(dnodex.plist[i])<=2 or i in dnodex.test_track:
-            i=random.randint(0,len(dnodex.plist)-1)
-        X = dnodex.plist[i][:-1]
-        Y = dnodex.plist[i][1:]
-	user=dnodex.ptrack[i]
-        lossf=str(rnn.train(X,Y, eta, 1.0)) 
-        for pos_p in dnodex.plist[i]:
-            if dnodex.ratings[user].item_set[pos_p]<0:
+        for user in xrange(dnodex.nuser):
+            if user not in p or len(p[user])==0:
                 continue
-            neg_poi=np.random.randint(dnodex.npoi)
-            while neg_poi in dnodex.ratings[user].item_set:
-                neg_poi=np.random.randint(dnodex.npoi)
-	    tr=T.dot(dnodex.umatrix[user,:],(dnodex.pmatrix[pos_p,:]-dnodex.pmatrix[neg_poi,:]).T)
-            sig=T.nnet.sigmoid(tr).eval()   
-            bpr_loss=(1-sig)*sig
-            bpr.trainpos(pos_p,neg_poi,user,eta,bpr_loss)
-            bpr.trainneg(neg_poi,user,eta,bpr_loss)
-        if it%500==0:
-            sys.stdout.write("\riteration: %s..." % (str(it)))
+            i=random.choice(p[user])
+            if len(dnodex.plist[i])<2:
+                continue
+            X = dnodex.plist[i][:-1]
+            Y = dnodex.plist[i][1:]
+            NP=[]
+            user=dnodex.ptrack[i]
+            for pos_p in X:
+                if dnodex.ratings[user].item_set[pos_p]<0:
+                    X.remove(pos_p)
+                    if pos_p in Y:
+                        Y.remove(pos_p)
+            if len(X)!=len(Y):
+                Y=Y[1:]
+	    while len(NP)!=len(X):
+	        neg_poi=np.random.randint(dnodex.npoi)
+                while neg_poi in dnodex.ratings[user].item_set:
+                    neg_poi=np.random.randint(dnodex.npoi)
+                NP.append(neg_poi)
+            if len(NP)==0:
+                continue
+            lossf=str(rnn.train(X,Y, eta, 1.0)) 
+            tmp_u= rnn.trainneg(X,NP,user,eta)
+            pfp_loss= rnn.trainpos(X,NP,user,eta)
+        if it%10000==0:
+            sys.stdout.write('\r%d iterations...'%(it))
             sys.stdout.flush()
 
 
@@ -365,34 +403,28 @@ def infer_bpr(dnodex):
         if user%20==0:
             sys.stdout.write('\r%d user prediction finished, p@10: %4f, AUC: %4f...' % (user,precision/(10*test_case),cumu_auc/test_case))
             sys.stdout.flush()
-        if user>=20:
-            break 
-        if len(dnodex.ratings[user].item_set)==dnodex.max_check_in:
-            continue
-        candidate=range(dnodex.npoi)
         X=[]
         test=[]
         for p in dnodex.ratings[user].item_set:
             if dnodex.ratings[user].item_set[p]>0:
-                candidate.remove(p)
                 X.append(p)
             else:
                 test.append(p)
-        if len(candidate)>0 and len(X)>0 and len(test)>0:
-	    r=T.dot(dnodex.umatrix[user,:],dnodex.pmatrix[candidate,:].T).eval()
-            hit=0
+        if len(X)>0 and len(test)>0:
+	    hit=0
             num_correct_pairs=0
-            res=np.argsort(r)[::-1]
-            for i in range(len(res)):
+            r=rnn.predict_bpr(user)
+	    res=[x1 for x1 in r if x1 not in X]
+	    for i in range(len(res)):
                 if res[i] in test:
                     hit+=1
                 else:
                     num_correct_pairs+=hit
-            cumu_auc+= (float)(num_correct_pairs)/((len(candidate) - len(test)) * len(test))
+            cumu_auc+= (float)(num_correct_pairs)/((dnodex.npoi-len(X) - len(test)) * len(test))
             precision+=len(set(res[:10])&set(test))
             test_case+=1
-    print 'Precision: ', precision/(10*test_case)
-    print 'AUC: ', cumu_auc/test_case
+    print '\nPrecision: ', precision/(10*test_case)
+    print '\nAUC: ', cumu_auc/test_case
 
 
 
@@ -456,11 +488,10 @@ if __name__ == '__main__':
 	personalized_train(data,args.eta,args.iters)
 	print 'Train completed'
         print 'Prediction starts...'
-        infer_personalized(data, rnn)
+        infer_pfp(data)
     elif args.module==2:
         print 'Personalized Seq + PFP Modeling'
         rnn=PerRNN(data,args.inputdim,args.dim)
-	pfp=PFP(data,args.inputdim)
         t1=time.time()
         personalized_pfp_train(data,args.eta,args.iters)
 	t2=time.time()
@@ -471,14 +502,13 @@ if __name__ == '__main__':
     elif args.module==3:
 	print 'BPR+Non-personalized Modeling'
 	rnn=NonPerRNN(data,args.inputdim,args.dim)
-	bpr=BPR(data,args.inputdim)
 	non_personalized_bpr_train(data,args.eta,args.iters)
 	print 'Train completed'
         print 'Prediction starts...'
         infer_bpr(data)       
     elif args.module==4:
         print 'BPR'
-        bpr=BPR(data,args.inputdim)
+	rnn=NonPerRNN(data,args.inputdim,args.dim)
         bpr_train(data,args.eta,args.iters)
         print 'Train completed'
         print 'Prediction starts...'
