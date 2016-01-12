@@ -46,7 +46,7 @@ class PerRNN:
         
         self.train = theano.function([X,Y,Z, eta, temperature], cost, updates=updates, allow_input_downcast=True)
         self.trainpos=theano.function([X,NP,Z,eta],tmp_u, updates=p_updates,allow_input_downcast=True)
-        self.trainneg=theano.function([X,NP,Z,eta],pfp_loss, updates=n_updates,allow_input_downcast=True)
+        self.trainneg=theano.function([X,NP,Z,eta],T.mean(pfp_loss), updates=n_updates,allow_input_downcast=True)
         
         predict_updates = one_step_updates(self.layers)
         
