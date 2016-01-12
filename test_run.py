@@ -208,6 +208,8 @@ def bpr_train(dnodex, eta, iters):
             for pos_p in X:
                 if dnodex.ratings[user].item_set[pos_p]<0:
                     X.remove(pos_p)
+            if len(X)==0:
+                continue
 	    while len(NP)!=len(X):
 	        neg_poi=np.random.randint(dnodex.npoi)
                 while neg_poi in dnodex.ratings[user].item_set:
@@ -240,6 +242,8 @@ def non_personalized_bpr_train(dnodex, eta, iters):
                     X.remove(pos_p)
                     if pos_p in Y:
                         Y.remove(pos_p)
+            if len(X)==0:
+                continue
             if len(X)!=len(Y):
                 Y=Y[1:]
 	    while len(NP)!=len(X):
