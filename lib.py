@@ -57,19 +57,19 @@ def SGD (cost, params, eta):
 def PerSGD (cost, params, eta, X, Z, dnodex):
     updates = []
     grads = T.grad(cost=cost, wrt=params)
-    updates.append([dnodex.pmatrix,T.set_subtensor(dnodex.pmatrix[X,:],dnodex.pmatrix[X,:]+eta*eta*grads[0])])
-    updates.append([dnodex.umatrix,T.set_subtensor(dnodex.umatrix[Z,:,:],dnodex.umatrix[Z,:,:]+eta*eta*grads[1])])
+    updates.append([dnodex.pmatrix,T.set_subtensor(dnodex.pmatrix[X,:],dnodex.pmatrix[X,:]-eta*grads[0])])
+    updates.append([dnodex.umatrix,T.set_subtensor(dnodex.umatrix[Z,:,:],dnodex.umatrix[Z,:,:]-eta*grads[1])])
     for p,g in zip(params[2:], grads[2:]):
-        updates.append([p, p + eta * eta * g])
+        updates.append([p, p - eta * eta * g])
 
     return updates
 
-def NPerSGD (cost, params, eta, X, dnodex):
+def NPerSGD (cost, params, eta, X):
     updates = []
     grads = T.grad(cost=cost, wrt=params)
-    updates.append([dnodex.pmatrix,T.set_subtensor(dnodex.pmatrix[X,:],dnodex.pmatrix[X,:]+eta*eta*grads[0])])
-    for p,g in zip(params[2:], grads[2:]):
-        updates.append([p, p + eta * eta * g])
+    updates.append([params[0],T.set_subtensor(params[0],params[0]-eta*grads[0])])
+    for p,g in zip(params[1:], grads[1:]):
+        updates.append([p, p - eta * eta * g])
 
     return updates
 

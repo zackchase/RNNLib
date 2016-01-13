@@ -72,7 +72,7 @@ class pdata(object):
                         cur_test+=1
                     if test_case<cur_test:
                         break
-        print cur_test, test_case
+        #print cur_test, test_case
 class Pnode:
     def __init__(self,pid):
         self.pid=pid
@@ -131,8 +131,8 @@ def load_poi_data(fi,split,inputdim):
             if rating_count % 10000 == 0:
                 sys.stdout.write("\rReading ratings %d" % rating_count)
                 sys.stdout.flush()
-            #if rating_count>5000:
-            #    break
+       #     if rating_count>5000:
+       #         break
         fi.close()
         sys.stdout.write("%s reading completed\n" % fi)
         dnodex=pdata(user_hash,vocab_hash,vocab_items,poi_list,poi_track,rating_count,split,inputdim)
@@ -222,6 +222,7 @@ def bpr_train(dnodex, eta, iters,lambd,ntusers):
             while user not in p or len(p[user])==0:
                 user=np.random.randint(dnodex.nuser)
             tusers.append(user)
+   # print rnn.umatrix[tusers[0],:].eval()
     for it in xrange(iters):
         for user in tusers:
             i=random.choice(p[user])
@@ -243,6 +244,8 @@ def bpr_train(dnodex, eta, iters,lambd,ntusers):
         if it%1000==0:
             sys.stdout.write('\r%d iterations...'%(it))
             sys.stdout.flush()
+   # print '\n'
+   # print rnn.umatrix[tusers[0],:].eval()
     return tusers
 
 def non_personalized_bpr_train(dnodex, eta, iters,lambd, ntusers):
@@ -315,6 +318,7 @@ def personalized_pfp_train(dnodex, eta, iters,lambd, ntusers):
             while user not in p or len(p[user])==0:
                 user=np.random.randint(dnodex.nuser)
             tusers.append(user)
+    #print rnn.umatrix[tusers[0],:,:].eval()
     for it in xrange(iters):
         for user in tusers:
             i=random.choice(p[user])
@@ -341,10 +345,11 @@ def personalized_pfp_train(dnodex, eta, iters,lambd, ntusers):
             lossf=str(rnn.train(X,Y,user, eta,lambd, 1.0)) 
             tmp_u= rnn.trainneg(X,NP,user,eta,lambd)
             pfp_loss= rnn.trainpos(X,NP,user,eta,lambd)
-        if it%10000==0:
+        if it%1000==0:
             sys.stdout.write('\r%d iterations...'%(it))
             sys.stdout.flush()
 
+  #  print rnn.umatrix[tusers[0],:,:].eval()
     return tusers
 
 
