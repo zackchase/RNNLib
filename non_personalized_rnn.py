@@ -10,6 +10,7 @@ class NonPerRNN:
 	Y=T.ivector()
 	Z=T.lscalar()
 	NP=T.ivector()
+	lambd = T.scalar()
 	eta = T.scalar()
         temperature=T.scalar()
         num_input = inputdim
@@ -36,14 +37,14 @@ class NonPerRNN:
         pfp_loss=pfp_loss1*(T.ones_like(pfp_loss1)-pfp_loss1)
 	tmp_u1=T.reshape(T.repeat(dnodex.umatrix[Z,:],X.shape[0]),(inputdim,X.shape[0])).T
         pfp_lossv=T.reshape(T.repeat(pfp_loss,inputdim),(inputdim,X.shape[0])).T
-	cost = T.mean(T.nnet.categorical_crossentropy(Y_hat, dnodex.pmatrix[Y,:]))+eta*dnodex.p_l2_norm+eta*dnodex.u_l2_norm
+	cost = lambd*10*T.mean(T.nnet.categorical_crossentropy(Y_hat, dnodex.pmatrix[Y,:]))+lambd*dnodex.p_l2_norm+lambd*dnodex.u_l2_norm
         updates = NPerSGD(cost,params,eta,X,dnodex)#momentum(cost, params, caches, eta)
 
-        n_updates=[(dnodex.pmatrix, T.set_subtensor(dnodex.pmatrix[NP,:],dnodex.pmatrix[NP,:]-eta*pfp_lossv*tmp_u1-eta*eta*dnodex.pmatrix[NP,:]))]
-	p_updates=[(dnodex.pmatrix, T.set_subtensor(dnodex.pmatrix[X,:],dnodex.pmatrix[X,:]+eta*pfp_lossv*tmp_u1-eta*eta*dnodex.pmatrix[X,:]))]
-        self.train = theano.function([X,Y, eta, temperature], cost, updates=updates, allow_input_downcast=True)
-        self.trainpos=theano.function([X,NP,Z,eta],T.mean(pfp_loss), updates=p_updates,allow_input_downcast=True)
-        self.trainneg=theano.function([X,NP,Z,eta],T.mean(pfp_loss), updates=n_updates,allow_input_downcast=True)
+        n_updates=[(dnodex.pmatrix, T.set_subtensor(dnodex.pmatrix[NP,:],dnodex.pmatrix[NP,:]-eta*pfp_lossv*tmp_u1-eta*lambd*dnodex.pmatrix[NP,:]))]
+	p_updates=[(dnodex.pmatrix, T.set_subtensor(dnodex.pmatrix[X,:],dnodex.pmatrix[X,:]+eta*pfp_lossv*tmp_u1-eta*lambd*dnodex.pmatrix[X,:]))]
+        self.train = theano.function([X,Y, eta, lambd, temperature], cost, updates=updates, allow_input_downcast=True)
+        self.trainpos=theano.function([X,NP,Z,eta,lambd],T.mean(pfp_loss), updates=p_updates,allow_input_downcast=True)
+        self.trainneg=theano.function([X,NP,Z,eta,lambd],T.mean(pfp_loss), updates=n_updates,allow_input_downcast=True)
 
 	rlist=T.argsort(T.dot(dnodex.umatrix[Z,:],dnodex.pmatrix.T))[::-1]
         self.predict_bpr = theano.function([Z], rlist, allow_input_downcast=True)
