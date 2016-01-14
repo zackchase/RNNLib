@@ -2,13 +2,15 @@ import numpy as np
 import theano
 import theano.tensor as T
 
-def one_hot(string):
+def one_hot(seq,s):
     """
-    Take a string and return a one-hot encoding with ASCII
+    Take a seq and size of total items,s as input, return one-hot-bit representation of the seq
     """
-    res = np.zeros((len(string), 256))
-    for i in xrange(len(string)):
-        res[i,ord(string[i])] = 1.
+    res = np.zeros((len(seq), s))
+    for i in xrange(len(seq)):
+	tmpr=format(seq[i],'b')
+	for x in range(len(tmpr)):
+            res[i,s-1-x] = float(tmpr[len(tmpr)-1-x])+0.
     return res
 
 def floatX(X):
@@ -52,6 +54,25 @@ def SGD (cost, params, eta):
         updates.append([p, p - eta * g])
 
     return updates
+def PerSGD (cost, params, eta, X, Z, dnodex):
+    updates = []
+    grads = T.grad(cost=cost, wrt=params)
+    updates.append([dnodex.pmatrix,T.set_subtensor(dnodex.pmatrix[X,:],dnodex.pmatrix[X,:]-eta*grads[0])])
+    updates.append([dnodex.umatrix,T.set_subtensor(dnodex.umatrix[Z,:,:],dnodex.umatrix[Z,:,:]-eta*grads[1])])
+    for p,g in zip(params[2:], grads[2:]):
+        updates.append([p, p - eta * eta * g])
+
+    return updates
+
+def NPerSGD (cost, params, eta, X):
+    updates = []
+    grads = T.grad(cost=cost, wrt=params)
+    updates.append([params[0],T.set_subtensor(params[0],params[0]-eta*grads[0])])
+    for p,g in zip(params[1:], grads[1:]):
+        updates.append([p, p - eta * eta * g])
+
+    return updates
+
 
 
 def momentum(cost, params, caches, eta, rho=.1):
@@ -71,7 +92,7 @@ def sample_char(probs):
 
 
 def one_hot_to_string(one_hot):
-    return chr(one_hot.nonzero()[0][0])
+    return int(''.join('1' if x>0 else '0' for x in one_hot),2)
 
 def get_params(layers):
     params = []
