@@ -345,7 +345,7 @@ def personalized_pfp_train(dnodex, eta, iters,lambd, ntusers):
 	    lossf=str(rnn.train(X,Y,user, eta,lambd, 1.0)) 
             pfp_loss= rnn.train_pfp(X,NP,user,eta,lambd)
         if it%1000==0:
-            sys.stdout.write('\r%d iterations...$4f'%(it,pfp_loss))
+            sys.stdout.write('\r%d iterations...%4f'%(it,pfp_loss))
             sys.stdout.flush()
 
   #  print rnn.umatrix[tusers[0],:,:].eval()
