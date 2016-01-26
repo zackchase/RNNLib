@@ -190,19 +190,56 @@ def personalized_train(dnodex, eta, iters, lambd, ntusers):
             sys.stdout.flush()
 
     return tusers
-def personalized_pmf_train(dnodex, eta, iters):
+def personalized_pfp_train(dnodex, eta, iters, lambd, ntusers):
+    p={}
+    for x in range(len(dnodex.plist)):
+        p[dnodex.ptrack[x]]=p.get(dnodex.ptrack[x],[])
+        p[dnodex.ptrack[x]].append(x)
+    tusers=[]
+    if ntusers<0:
+        ntusers=dnodex.nuser
+        for user in range(ntusers):
+            if user not in p or len(p[user])==0:
+                continue
+            tusers.append(user)
+    else:
+        while len(tusers)<ntusers:
+            user=np.random.randint(dnodex.nuser)
+            while user not in p or len(p[user])==0:
+                user=np.random.randint(dnodex.nuser)
+            tusers.append(user)
+    #print rnn.umatrix[tusers[0],:,:].eval()
     for it in xrange(iters):
-        i = random.randint(0,len(dnodex.plist)-1)
-        while len(dnodex.plist[i])<=2 or i in dnodex.test_track:
-            i=random.randint(0,len(dnodex.plist)-1)
-#        print len(dnodex.plist[i])
-        X = dnodex.plist[i][:-1]
-        Y = dnodex.plist[i][1:]
-	user=dnodex.ptrack[i]
-        lossf=str(rnn.train(X,Y,user, eta, 1.0))
-        if it%500==0:
-            print "iteration: %s, cost: %s" % (str(it), lossf)
-            #infer_stochastic(dnodex,rnn)
+        for user in tusers:
+            i=random.choice(p[user])
+            if len(dnodex.plist[i])<2:
+                continue
+            X = dnodex.plist[i][:-1]
+            Y = dnodex.plist[i][1:]
+            NP=[]
+            user=dnodex.ptrack[i]
+            for pos_p in X:
+                if dnodex.ratings[user].item_set[pos_p]<0:
+                    X.remove(pos_p)
+                    if pos_p in Y:
+                        Y.remove(pos_p)
+            if len(X)!=len(Y):
+                Y=Y[1:]
+	    while len(NP)!=len(X):
+	        neg_poi=np.random.randint(dnodex.npoi)
+                while neg_poi in dnodex.ratings[user].item_set:
+                    neg_poi=np.random.randint(dnodex.npoi)
+                NP.append(neg_poi)
+            if len(NP)==0:
+                continue
+            pfp_loss= rnn.train_pfp(X,NP,user,eta,lambd)
+        if it%1000==0:
+            sys.stdout.write('\r%d iterations...%4f'%(it,pfp_loss))
+            sys.stdout.flush()
+
+  #  print rnn.umatrix[tusers[0],:,:].eval()
+    return tusers
+
 
 def bpr_train(dnodex, eta, iters,lambd,ntusers):
     p={}
@@ -524,11 +561,11 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-train', help='Training file', dest='fi', required=True)
     parser.add_argument('-split', help='Split for testing', dest='split', type=float,default=0.8)
-    parser.add_argument('-module', help='Model module, 0: Non_personalized LSTM, 1: Personalized LSTM, 2: PFP-AUC+Personalized LSTM, 3: BPR+Non_personalized LSTM, 4: BPR', dest='module', default=0, type=int)
+    parser.add_argument('-module', help='Model module, 0: Personalized PFP, 1: Personalized LSTM, 2: PFP-AUC+Personalized LSTM, 3: BPR+Non_personalized LSTM, 4: BPR', dest='module', default=0, type=int)
     parser.add_argument('-inputdim', help='Dimensionality of input poi', dest='inputdim', default=10, type=int)
     parser.add_argument('-dim', help='Dimensionality of hidden layers', dest='dim', default=10, type=int)
     parser.add_argument('-eta',dest='eta',default=0.002,type=float)
-    parser.add_argument('-lambda',dest='lambdap',default=0.005,type=float)
+    parser.add_argument('-lambda',dest='lambdap',default=0.01,type=float)
     parser.add_argument('-iters', dest='iters', default=800,type=int)
     parser.add_argument('-tusers', dest='tusers', default=-1,type=int)
     args=parser.parse_args()
@@ -536,12 +573,12 @@ if __name__ == '__main__':
     data = load_poi_data(args.fi,args.split,args.inputdim)
     tusers=[]
     if args.module==0:
-	print 'Non_personalized Seq Modeling'
-        rnn=NonPerRNN(data,args.inputdim,args.dim)
-    	tusers=non_personalized_train(data,args.eta,args.iters,args.lambdap,args.tusers)
+	print 'PFP Learning'
+        rnn=PerRNN(data,args.inputdim,args.dim)
+    	tusers=personalized_pfp_train(data,args.eta,args.iters,args.lambdap,args.tusers)
 	print 'Train completed'
         print 'Prediction starts...'
-    	infer_stochastic(data,rnn)
+    	infer_pfp(data,tusers)
     elif args.module==1:
         print 'Personalized Seq Modeling'
         rnn=PerRNN(data,args.inputdim,args.dim)
