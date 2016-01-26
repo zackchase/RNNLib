@@ -239,10 +239,10 @@ def bpr_train(dnodex, eta, iters,lambd,ntusers):
                 while neg_poi in dnodex.ratings[user].item_set:
                     neg_poi=np.random.randint(dnodex.npoi)
                 NP.append(neg_poi)
-            tmp_u= rnn.trainneg(X,NP,user,eta,lambd)
-            pfp_loss= rnn.trainpos(X,NP,user,eta,lambd)
+	    users=[user]*len(X)
+            bpr_loss= rnn.train_bpr(X,NP,users,eta,lambd)
         if it%1000==0:
-            sys.stdout.write('\r%d iterations...'%(it))
+            sys.stdout.write('\r%d iterations...%4f'%(it,bpr_loss))
             sys.stdout.flush()
    # print '\n'
    # print rnn.umatrix[tusers[0],:].eval()
@@ -292,8 +292,8 @@ def non_personalized_bpr_train(dnodex, eta, iters,lambd, ntusers):
             if len(NP)==0:
                 continue
             lossf=str(rnn.train(X,Y, eta,lambd, 1.0)) 
-            tmp_u= rnn.trainneg(X,NP,user,eta,lambd)
-            pfp_loss= rnn.trainpos(X,NP,user,eta,lambd)
+	    users=[user]*len(X)
+            bpr_loss= rnn.train_bpr(X,NP,users,eta,lambd)
         if it%10000==0:
             sys.stdout.write('\r%d iterations...'%(it))
             sys.stdout.flush()
@@ -342,11 +342,10 @@ def personalized_pfp_train(dnodex, eta, iters,lambd, ntusers):
                 NP.append(neg_poi)
             if len(NP)==0:
                 continue
-            lossf=str(rnn.train(X,Y,user, eta,lambd, 1.0)) 
-            tmp_u= rnn.trainneg(X,NP,user,eta,lambd)
-            pfp_loss= rnn.trainpos(X,NP,user,eta,lambd)
+	    lossf=str(rnn.train(X,Y,user, eta,lambd, 1.0)) 
+            pfp_loss= rnn.train_pfp(X,NP,user,eta,lambd)
         if it%1000==0:
-            sys.stdout.write('\r%d iterations...'%(it))
+            sys.stdout.write('\r%d iterations...$4f'%(it,pfp_loss))
             sys.stdout.flush()
 
   #  print rnn.umatrix[tusers[0],:,:].eval()
