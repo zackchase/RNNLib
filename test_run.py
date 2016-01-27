@@ -163,13 +163,15 @@ def personalized_train(dnodex, eta, iters, lambd, ntusers):
             tusers.append(user)
     for it in xrange(iters):
         for user in tusers:
-            i=random.choice(p[user])
-            if len(dnodex.plist[i])<2:
-                continue
-            X = dnodex.plist[i][:-1]
-            Y = dnodex.plist[i][1:]
+            #i=random.choice(p[user])
+            #if len(dnodex.plist[i])<2:
+            #    continue
+            X=[]
+            for i in p[user]:
+                X += dnodex.plist[i]
+            Y = X[1:]#dnodex.plist[i][1:]
+            X=X[:-1]
             NP=[]
-            user=dnodex.ptrack[i]
             for pos_p in X:
                 if dnodex.ratings[user].item_set[pos_p]<0:
                     X.remove(pos_p)
@@ -211,13 +213,15 @@ def personalized_pfp_train(dnodex, eta, iters, lambd, ntusers):
     #print rnn.umatrix[tusers[0],:,:].eval()
     for it in xrange(iters):
         for user in tusers:
-            i=random.choice(p[user])
-            if len(dnodex.plist[i])<2:
-                continue
-            X = dnodex.plist[i][:-1]
-            Y = dnodex.plist[i][1:]
+            #i=random.choice(p[user])
+            #if len(dnodex.plist[i])<2:
+            #    continue
+            X=[]
+            for i in p[user]:
+                X += dnodex.plist[i]
+            Y = X[1:]#dnodex.plist[i][1:]
+            X=X[:-1]
             NP=[]
-            user=dnodex.ptrack[i]
             for pos_p in X:
                 if dnodex.ratings[user].item_set[pos_p]<0:
                     X.remove(pos_p)
@@ -266,7 +270,6 @@ def bpr_train(dnodex, eta, iters,lambd,ntusers):
             for i in p[users]:
                 X+= dnodex.plist[i]
             NP=[]
-            user=dnodex.ptrack[i]
             for pos_p in X:
                 if dnodex.ratings[user].item_set[pos_p]<0:
                     X.remove(pos_p)
@@ -315,7 +318,6 @@ def non_personalized_bpr_train(dnodex, eta, iters,lambd, ntusers):
             Y = X[1:]#dnodex.plist[i][1:]
             X=X[:-1]
             NP=[]
-            user=dnodex.ptrack[i]
             for pos_p in X:
                 if dnodex.ratings[user].item_set[pos_p]<0:
                     X.remove(pos_p)
