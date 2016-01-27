@@ -60,7 +60,7 @@ class NonPerRNN:
         self.train = theano.function([X,Y, eta, lambd, temperature], cost, updates=updates, allow_input_downcast=True)
         self.train_bpr=theano.function([X,NP,user,eta,lambd], outputs=cost_bpr, updates=bpr_updates,allow_input_downcast=True)
 
-        rlist=T.argsort(T.dot(self.umatrix[Z,:],self.pmatrix.T))[::-1]
+        rlist=T.argsort(T.dot(self.umatrix[Z,:],self.pmatrix.T)+self.B)[::-1]
         self.predict_bpr = theano.function([Z], rlist, allow_input_downcast=True)
     def reset_state(self):
         for layer in self.layers:

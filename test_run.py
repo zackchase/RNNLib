@@ -262,8 +262,9 @@ def bpr_train(dnodex, eta, iters,lambd,ntusers):
    # print rnn.umatrix[tusers[0],:].eval()
     for it in xrange(iters):
         for user in tusers:
-            i=random.choice(p[user])
-            X = dnodex.plist[i]
+            X=[]
+            for i in p[users]:
+                X+= dnodex.plist[i]
             NP=[]
             user=dnodex.ptrack[i]
             for pos_p in X:
@@ -305,11 +306,14 @@ def non_personalized_bpr_train(dnodex, eta, iters,lambd, ntusers):
             tusers.append(user)
     for it in xrange(iters):
         for user in tusers:
-            i=random.choice(p[user])
-            if len(dnodex.plist[i])<2:
-                continue
-            X = dnodex.plist[i][:-1]
-            Y = dnodex.plist[i][1:]
+         #   i=random.choice(p[user])
+         #   if len(dnodex.plist[i])<2:
+         #       continue
+            X=[]
+            for i in p[user]:
+                X+= dnodex.plist[i][:-1]
+            Y = X[1:]#dnodex.plist[i][1:]
+            X=X[:-1]
             NP=[]
             user=dnodex.ptrack[i]
             for pos_p in X:
@@ -488,7 +492,8 @@ def infer_personalized(dnodex, rnn):
     print 'AUC: ', cumu_auc/test_case
 
 
-def infer_bpr(dnodex,tusers):
+
+def infer_bpr_tong(dnodex,tusers):
     precision=0.0
     test_case=0.000001
     cumu_auc=0.0
@@ -552,6 +557,41 @@ def infer_pfp(dnodex,tusers):
     print '\nPrecision: ', precision/(10*test_case)
     print '\nAUC: ', cumu_auc/test_case
 
+def infer_bpr(dnodex, rnn,tusers):
+    auc_values = []
+    z = 0
+    w = rnn.umatrix.get_value()
+    h = rnn.pmatrix.get_value()
+    b = rnn.B.get_value()
+    for user in tusers:
+        X=[]
+        test=[]
+        for p in dnodex.ratings[user].item_set:
+            if dnodex.ratings[user].item_set[p]>0:
+                X.append(p)
+            else:
+                test.append(p)
+        if len(test)!=0:
+            auc_for_user = 0.0
+            n = 0
+            predictions = w[user,:].dot(h.T)+b
+            for pos_item in test:
+                if pos_item>=0:
+                    for neg_item in range(dnodex.npoi):
+                        if neg_item not in X and neg_item not in test:
+                            n += 1
+                            if predictions[pos_item] > predictions[neg_item]:
+                                auc_for_user += 1
+            if n > 0:
+                auc_for_user /= n
+                auc_values.append(auc_for_user)
+        z += 1
+        if z % 10 == 0 and len(auc_values) > 0:
+            sys.stderr.write("\rCurrent AUC mean (%s samples): %0.5f" % (str(z), np.mean(auc_values)))
+            sys.stderr.flush()
+    sys.stderr.write("\n")
+    sys.stderr.flush()
+    print np.mean(auc_values)
 
 
 
@@ -569,7 +609,6 @@ if __name__ == '__main__':
     parser.add_argument('-iters', dest='iters', default=800,type=int)
     parser.add_argument('-tusers', dest='tusers', default=-1,type=int)
     args=parser.parse_args()
-    parser.print_help()
     data = load_poi_data(args.fi,args.split,args.inputdim)
     tusers=[]
     if args.module==0:
@@ -602,11 +641,11 @@ if __name__ == '__main__':
 	tusers=non_personalized_bpr_train(data,args.eta,args.iters,args.lambdap,args.tusers)
 	print 'Train completed'
         print 'Prediction starts...'
-        infer_bpr(data,tusers)       
+        infer_bpr(data,rnn,tusers)       
     elif args.module==4:
         print 'BPR'
 	rnn=NonPerRNN(data,args.inputdim,args.dim)
         tusers=bpr_train(data,args.eta,args.iters,args.lambdap,args.tusers)
         print 'Train completed'
         print 'Prediction starts...'
-        infer_bpr(data,tusers)
+        infer_bpr(data,rnn,tusers)

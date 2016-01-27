@@ -52,7 +52,7 @@ class PerRNN:
         g_cost_B = T.grad(cost=pfp_cost, wrt=self.B)
 
         pfp_updates = [ (self.umatrix, self.umatrix - eta * g_cost_u), (self.pmatrix, self.pmatrix - eta * g_cost_p), (self.B, self.B - eta * g_cost_B) ]
-        rlist=T.argsort(T.dot(tmp_u,self.pmatrix.T))[::-1]
+        rlist=T.argsort(T.dot(tmp_u,self.pmatrix.T)+self.B)[::-1]
        
         self.train = theano.function([X,Y,Z, eta, lambd, temperature], cost, updates=updates, allow_input_downcast=True)
         self.train_pfp=theano.function([X, NP, Z, eta, lambd], outputs=pfp_cost, updates=pfp_updates,allow_input_downcast=True, on_unused_input='ignore')
