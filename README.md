@@ -1,2 +1,2 @@
-# PyRNN
-A general purpose RNN library based on Python &amp; theano.
+# Collaborative & Personalized LSTM for POI Recommendation
+A collaborative deep method for POI rec based on PyRNN
